@@ -12,6 +12,7 @@ import type {
   QuestionDifficulty,
   QuestionPurpose,
 } from "@/types/planner";
+import type { AnswerEvaluation } from "@/types/llm";
 
 export type MessageRole = "assistant" | "user";
 
@@ -26,9 +27,9 @@ export interface InterviewMessage {
 export type InterviewStatus = "active" | "completed";
 
 /**
- * One answered planned question. The engine does not generate natural-language
- * question text yet, so a turn preserves the full question specification the
- * future LLM service can phrase a question from.
+ * One answered planned question. A turn preserves the full question
+ * specification, the natural-language question that was actually shown to the
+ * candidate, the candidate's answer, and the evaluation of that answer.
  */
 export interface ConversationTurn {
   questionNumber: number;
@@ -37,8 +38,12 @@ export interface ConversationTurn {
   objective: string;
   purpose: QuestionPurpose;
   difficulty: QuestionDifficulty;
+  /** Natural-language question text shown to the candidate. */
+  questionText: string;
   /** Candidate answer as submitted. Empty strings are stored safely. */
   answer: string;
+  /** Per-answer assessment; null when the answer was never evaluated. */
+  evaluation: AnswerEvaluation | null;
   answeredAt: string;
 }
 
@@ -51,8 +56,16 @@ export interface InterviewSession {
   candidate: Candidate;
   analysis: CandidateAnalysis;
   plan: InterviewPlan;
-  /** Index of the next question to ask; equals `plan.questions.length` when none remain. */
+  /** Index of the next planned question to ask; equals `plan.questions.length` when none remain. */
   currentQuestionIndex: number;
+  /** Natural-language text of the currently active question (planned or follow-up). */
+  currentQuestionText: string;
+  /** True once an answer-dependent follow-up has replaced the planned follow-up slot (Q8). */
+  followUpUsed: boolean;
+  /** True while the synthetic answer-dependent follow-up is the active question. */
+  followUpActive: boolean;
+  /** The synthetic follow-up specification when `followUpActive` is true. */
+  followUpSpec: PlannedQuestion | null;
   /** Answered turns in chronological order; the reconstructable conversation. */
   turns: ConversationTurn[];
   startedAt: string;
@@ -62,6 +75,7 @@ export interface InterviewSession {
 
 export type EngineErrorCode =
   | "session-not-found"
+  | "session-already-exists"
   | "interview-completed"
   | "invalid-input"
   | "internal";
@@ -90,6 +104,14 @@ export type ContinueInterviewResult =
   /** Every planned question has been answered: the session is completed. */
   | { ok: true; done: true; session: InterviewSession }
   | { ok: false; error: EngineError };
+
+/** Final aggregate feedback returned when the interview completes. */
+export interface FinalFeedback {
+  summary: string;
+  strengths: string[];
+  gaps: string[];
+  next: string[];
+}
 
 /** Future evaluator output; implemented in a later milestone. */
 export interface QuestionFeedback {

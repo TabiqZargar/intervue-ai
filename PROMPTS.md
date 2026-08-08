@@ -227,3 +227,67 @@ and no API key required.
 - Deployment configuration beyond documenting environment variables
 
 **Status:** Complete.
+
+## Prompt 6 — Interview API Endpoint + Aggregate Feedback
+
+**Goal:** Connect every system into a single conversation through the required
+`POST /api/interview` endpoint and return final aggregate feedback. The
+deterministic planner/engine remains authoritative for question count,
+progression, completion, and storage; the LLM never controls the lifecycle.
+
+**What was done:**
+
+- Implemented `app/api/interview/route.ts` as a thin route over a new
+  `services/interview-service.ts` orchestration layer; all decision logic lives
+  in services.
+- Added the authoritative API contract in `types/api.ts`:
+  - Start: `{ sessionId, candidate }` → `{ reply: "Welcome. Let's begin your interview.", done: false }`.
+  - Continue: `{ sessionId, message }` → `{ reply: "...", done: false }`.
+  - Final: `{ reply: "Interview completed.", done: true, feedback: { summary, strengths[], gaps[], next[] } }`.
+  - No separate GET endpoint; the route returns 200 / 400 / 404 / 500 / 502 / 503
+    and never surfaces keys, headers, prompts, stack traces, or raw provider errors.
+- Extended the engine (`services/interview-engine.ts`) with the M6 pieces while
+  keeping it deterministic:
+  - `startInterview(candidate, { sessionId })` (rejects a used `sessionId`).
+  - `continueInterview(sessionId, answer, { evaluation })` stores the full turn
+    (spec + question text + answer + evaluation) and advances the session.
+  - `setCurrentQuestionText(sessionId, text)` records phrased questions.
+  - Follow-up slotting: when the evaluator sets `followUpRecommended`, the
+    engine replaces the planner's reserved Q8 follow-up slot with a synthetic
+    follow-up probing the answered topic; otherwise it continues to the next
+    planned question. Exactly one follow-up per interview, always 8 questions,
+    no loops, no early termination.
+  - Exported pure `resolveContinueState` so the service can phrase the next
+    question before the engine commits the turn.
+- Implemented `services/feedback.ts` (`buildFinalFeedback`): deterministic
+  aggregation of stored evaluations into `summary` / `strengths` / `gaps` /
+  `next` — no extra LLM call.
+- Implemented `services/interview-service.ts`: welcome on turn 0 (no LLM call),
+  first message phrases Q1, later messages are evaluated then answered with a
+  follow-up or the next planned question; the engine commits state only after
+  evaluation and phrasing succeed, so provider failures are retry-safe.
+- Added `lib/validators.ts`: structural request validation (`member.id` string,
+  `member.yearsExperience` finite ≥ 0, `missions` array, optional `signals`).
+- Updated `types/interview.ts` (turn `questionText` + `evaluation`, session
+  `currentQuestionText`/follow-up fields, `FinalFeedback`, new error code) and
+  exported `types/api.ts` from `types/index.ts`.
+- Updated `README.md` (API contract, turn semantics, status codes, env vars,
+  pipeline, dev status) and this prompt log.
+
+**Verification:** a temporary script (removed afterwards) exercised the service
+with an injected mock client and the real HTTP route against a local mock
+OpenAI-compatible server: turn semantics (no LLM call on turn 0), first-message
+phrasing, evaluator receives every candidate answer, follow-up slotting
+(triggered + not triggered, resumes next planned question, still 8 turns, no
+infinite loop), completion + feedback shape, multi-session isolation, duplicate
+`sessionId` → 400, unknown → 404, completed → 400, invalid bodies → 400, and
+LLM failure mapping (502 / 500 / 503) with no state mutation: 46 checks, 0
+failures. Lint, `tsc --noEmit`, and `next build` all pass.
+
+**Explicitly deferred to later prompts (do not implement early):**
+
+- Interview UI at `/interview` and a feedback report page
+- Database, authentication, deployment, real provider configuration
+  (only environment-variable documentation is provided)
+
+**Status:** Complete.
