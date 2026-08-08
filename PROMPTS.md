@@ -360,3 +360,61 @@ failures. Lint, `tsc --noEmit`, and `next build` all pass.
   consumed as-is; the UI invents no topics or scores)
 
 **Status:** Complete.
+
+## Prompt 8 — Landing Page + Product Identity
+
+**Goal:** Transform the minimal `/` page into a polished, mobile-first landing
+page for Intervue AI that positions it as the AI technical interviewer for the
+ABTalks AI Cohort, communicates what it is / who it is for / what makes it
+different / how the interview works / why the feedback is useful, and routes
+cleanly into `/interview`. No backend, API, or data changes.
+
+**What was done:**
+
+- Created `components/landing/` section components that reuse the interview
+  UI's visual language (zinc surfaces, `border-zinc-200`/`dark:border-zinc-800`
+  borders, `bg-indigo-600` rounded buttons, uppercase indigo kickers):
+  - `LandingHeader.tsx` — sticky, backdrop-blur header: Intervue AI + "ABTalks
+    AI Cohort" brand block and a Start Interview action → `/interview`.
+  - `Hero.tsx` — headline "Turn your learning into interview confidence.",
+    positioning copy, "Start Your Interview" CTA → `/interview`, and the
+    `8 questions · Adaptive follow-ups · Actionable feedback` line.
+  - `HowItWorks.tsx` — three simple numbered steps (Understand Your Journey /
+    Interview Naturally / Learn From the Result).
+  - `Comparison.tsx` — "Why Intervue AI": a restrained scripted-quiz vs.
+    adaptive comparison (same questions / no context / fixed difficulty /
+    generic feedback versus personalized questions / conversation context /
+    adaptive follow-ups / actionable feedback).
+  - `WhatYouGet.tsx` — four outcome cards (Personalized Interview, Technical
+    Evaluation, Strengths & Gaps, Next Steps).
+  - `FinalCta.tsx` — closing panel "Ready to test what you actually know?"
+    with a Start Interview button → `/interview`.
+  - `Footer.tsx` — minimal footer (brand + cohort), no fake links/contact/
+    testimonials/statistics.
+- Rewrote `app/page.tsx` to compose the sections and set metadata:
+  - `title: { absolute: "Intervue AI — AI Technical Interviewer" }`
+  - concise description explaining the product.
+- Updated `README.md` (landing page section + development status) and this
+  prompt log.
+
+**Verification:**
+
+- SSR smoke test of the production build: `GET /` returns 200 and contains the
+  exact title tag, hero headline, all five sections, the footer, and CTA links
+  with `href="/interview"`; `GET /interview` still returns 200 and renders the
+  candidate selector (interview experience untouched).
+- Layout review for 390px: single-column grids below `sm`, no fixed widths or
+  `whitespace-nowrap` on long text, `min-h-[44px]` buttons, `px-4` padding —
+  no horizontal overflow.
+- `npm run lint`, `npx tsc --noEmit`, and `next build` all pass; `/` is
+  prerendered as static content. `git status` confirms only `app/page.tsx` and
+  new `components/landing/` files changed — no backend, data, or dependency
+  changes.
+
+**Explicitly deferred to later prompts (do not implement early):**
+
+- New interview features, new AI agents, authentication, database
+- Recruiter/dashboard/admin pages, voice, social integrations, analytics
+- Backend architecture changes or unnecessary refactors
+
+**Status:** Complete.

@@ -1,29 +1,30 @@
-import Link from "next/link";
+import type { Metadata } from "next";
+import { LandingHeader } from "@/components/landing/LandingHeader";
+import { Hero } from "@/components/landing/Hero";
+import { HowItWorks } from "@/components/landing/HowItWorks";
+import { Comparison } from "@/components/landing/Comparison";
+import { WhatYouGet } from "@/components/landing/WhatYouGet";
+import { FinalCta } from "@/components/landing/FinalCta";
+import { Footer } from "@/components/landing/Footer";
+
+export const metadata: Metadata = {
+  title: { absolute: "Intervue AI — AI Technical Interviewer" },
+  description:
+    "Intervue AI conducts a personalized technical interview for the ABTalks AI Cohort — adaptive questions and actionable feedback based on your learning journey.",
+};
 
 export default function Home() {
   return (
-    <main className="flex flex-1 items-center justify-center px-6 py-24">
-      <div className="flex w-full max-w-xl flex-col items-center gap-5 text-center">
-        <span className="rounded-full border border-zinc-200 px-3 py-1 text-xs font-medium text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
-          The Interview Agent
-        </span>
-        <h1 className="text-4xl font-semibold tracking-tight text-zinc-900 sm:text-5xl dark:text-zinc-50">
-          Intervue AI
-        </h1>
-        <p className="text-lg font-medium text-zinc-700 dark:text-zinc-300">
-          Adaptive AI Technical Interview Agent
-        </p>
-        <p className="max-w-md text-base leading-7 text-zinc-600 dark:text-zinc-400">
-          Personalized technical interviews based on your AI engineering learning
-          journey.
-        </p>
-        <Link
-          href="/interview"
-          className="rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60"
-        >
-          Start an interview
-        </Link>
-      </div>
-    </main>
+    <div className="flex min-h-full flex-1 flex-col">
+      <LandingHeader />
+      <main className="flex flex-1 flex-col">
+        <Hero />
+        <HowItWorks />
+        <Comparison />
+        <WhatYouGet />
+        <FinalCta />
+      </main>
+      <Footer />
+    </div>
   );
 }

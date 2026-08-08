@@ -42,7 +42,7 @@ and never loops or ends early.
 ## Development Status
 
 - Project scaffold (Next.js, TypeScript, Tailwind CSS) — done
-- Landing page at `/` — done
+- Landing page at `/` — done (product landing: hero, how it works, quiz-vs-adaptive comparison, what you get, final CTA, metadata)
 - Supplied synthetic data (`data/curriculum.json`, `data/candidates.json`) — loaded as the source of truth
 - Typed curriculum data access (`getCurriculum`, `getDay`, `getModule`, `getDaysForModule`) — done
 - Typed candidate data access (`getCandidates`, `getCandidate`) — done
@@ -116,6 +116,29 @@ Sessions are isolated per `sessionId` and live in process memory (no database).
 
 Errors never expose API keys, provider messages, stack traces, or internal
 prompts.
+
+## Landing Page (`/`)
+
+The `/` page is the product's public landing experience: a mobile-first,
+single-page layout that positions Intervue AI as the AI technical interviewer
+for the ABTalks AI Cohort. It communicates what the product is, who it is for,
+what makes it different, how the interview works, and why the feedback is
+useful, then routes into `/interview`.
+
+Sections: sticky header (brand + Start Interview) · hero (headline, positioning,
+primary CTA, `8 questions · Adaptive follow-ups · Actionable feedback`) ·
+How it works (3 steps) · Why Intervue AI (scripted-quiz vs. adaptive
+comparison) · What you get (4 outcomes) · final CTA · minimal footer.
+
+Design notes:
+
+- Extends the interview UI's visual language (zinc surfaces, `border-zinc-200`
+  borders, `bg-indigo-600` buttons, uppercase kickers) rather than creating a
+  separate look.
+- No stock images, fake testimonials, fake statistics, fake logos, or heavy
+  animation; no new dependencies.
+- Page metadata: title `Intervue AI — AI Technical Interviewer` and a concise
+  description.
 
 ## Interview UI (`/interview`)
 
