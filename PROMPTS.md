@@ -106,3 +106,61 @@ all passed and the script was removed afterwards.
 - Feedback generation
 
 **Status:** Complete.
+
+## Prompt 4 — Interview Engine + Conversation Memory
+
+**Goal:** Implement the runtime interview state and short-term conversation
+memory only. The engine owns the interview lifecycle (start/continue/complete)
+but does NOT phrase natural-language questions; it returns question
+specifications and stores answers as conversation turns. No LLM, evaluator,
+API route, or UI was implemented.
+
+**What was done:**
+
+- Redesigned `types/interview.ts` to model the runtime:
+  - `ConversationTurn` — question number, curriculum day/title, objective,
+    purpose, difficulty, candidate answer, timestamp. Since the engine does not
+    generate question text yet, a turn preserves the full question
+    specification the future LLM service can phrase a question from.
+  - `InterviewSession` — sessionId, candidate, analysis, plan,
+    `currentQuestionIndex`, turns, startedAt, completedAt, status
+    (`"active" | "completed"`).
+  - Typed results for the future API: `StartInterviewResult`,
+    `ContinueInterviewResult`, and a small `EngineError` model
+    (`session-not-found`, `interview-completed`, `invalid-input`, `internal`).
+  - Kept `MessageRole`/`InterviewMessage` (used by the future API types) and
+    the future `QuestionFeedback`/`InterviewFeedback` evaluator types.
+- Implemented `services/memory.ts`: `createMemory()` returns a `Map`-backed
+  in-memory store (`createSession`, `getSession`, `updateSession`,
+  `appendTurn`, `completeSession`, `deleteSession`, `clear`). Updates are
+  immutable; no persistence, no semantic/vector memory, no summaries.
+- Implemented `services/interview-engine.ts`: `createInterviewEngine(memory)`
+  provides `startInterview` (analyze → plan → validate 8-question / 4+ day
+  guarantees → create session → return Q1 spec), `continueInterview` (reject
+  unknown/completed sessions → store the current question's turn → advance the
+  index → return the next spec or mark the session completed),
+  `getSession`, and `deleteSession`. No random question selection; question
+  progression is index-based and deterministic. The follow-up slot simply
+  progresses as the next planned question (intelligent, answer-dependent
+  follow-ups are reserved for the LLM milestone).
+- Exported a default `interviewEngine` singleton (its own in-memory memory) for
+  the future API route; fresh isolated engines are available via the factory.
+- The future LLM boundary stays clean: the engine returns `PlannedQuestion`
+  specs and the session exposes conversation history + candidate context
+  (`analysis`, `turns`) for the later LLM service and evaluator. No prompt
+  strings live in the engine.
+
+**Verification:** a temporary script (removed afterwards) ran full interviews
+for CAND-001 (high-attempt), CAND-010 (failed missions), CAND-011 (skipped
+missions), CAND-016 (failed + high-attempt), and CAND-018 (strong first-try
+signals) plus session-isolation and error-path checks: 280 checks, 0 failures.
+
+**Explicitly deferred to later prompts (do not implement early):**
+
+- LLM calls, question phrasing, evaluator logic
+- `POST /api/interview` API route behavior
+- Interview UI at `/interview`
+- Feedback generation
+- Database, authentication, vector database, embeddings, RAG, agent frameworks
+
+**Status:** Complete.

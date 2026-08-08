@@ -2,9 +2,21 @@
 
 Intervue AI is an adaptive AI technical interview agent that conducts realistic,
 multi-turn technical interviews personalized to a candidate's AI engineering
-learning journey. It plans a question sequence from a curriculum, adapts with
-intelligent follow-up questions, maintains interview context, and produces
-structured feedback through a simple HTTP API.
+learning journey. It plans a question sequence from a curriculum, runs the
+interview through an in-memory session engine, and will produce structured
+feedback through a simple HTTP API (LLM and API are upcoming milestones).
+
+## Pipeline
+
+```text
+Candidate
+   → deterministic candidate analysis (analyzeCandidate)
+   → personalized interview planning (createInterviewPlan)
+   → interview state engine (createInterviewEngine)
+   → session memory (createMemory) → conversation turns
+   → next-question decision
+   → future LLM service (question phrasing, answer evaluation — pending)
+```
 
 ## Technology Stack
 
@@ -22,7 +34,9 @@ structured feedback through a simple HTTP API.
 - Typed candidate data access (`getCandidates`, `getCandidate`) — done
 - Deterministic candidate analysis (`analyzeCandidate`) — done
 - Deterministic interview planner (`createInterviewPlan`) — done (8 questions, 4+ curriculum days, personalized via candidate signals)
-- Interview engine, memory, evaluator, LLM service — pending
+- Short-term conversation memory (`createMemory`) — done (in-memory session store, `Map`-backed, no persistence)
+- Interview state engine (`createInterviewEngine`) — done (start/continue/complete lifecycle, typed results for the future API)
+- LLM service, evaluator — pending
 - `POST /api/interview` API route — pending
 - Interview UI at `/interview` — pending
 - Feedback generation — pending
