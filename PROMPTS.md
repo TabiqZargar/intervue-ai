@@ -164,3 +164,66 @@ signals) plus session-isolation and error-path checks: 280 checks, 0 failures.
 - Database, authentication, vector database, embeddings, RAG, agent frameworks
 
 **Status:** Complete.
+
+## Prompt 5 — LLM Service + Answer Evaluator
+
+**Goal:** Implement the runtime AI layer: a configurable, provider-agnostic LLM
+service for natural-language question generation plus a structured answer
+evaluator. The deterministic planner/engine remains authoritative for the
+8-question / 4+ curriculum-day requirements, progression, completion, and
+conversation storage. No API route, UI, database, RAG, embeddings, or agent
+framework was implemented.
+
+**What was done:**
+
+- Added `types/llm.ts` (exported from `types/index.ts`): `LlmConfig`,
+  `LlmChatMessage`, `LlmServiceErrorCode`/`LlmServiceError`,
+  `LlmCallResult<T>`, `GeneratedQuestion`, `AnswerEvaluation`
+  (`overall` strong/adequate/weak, `score`/`correctness`/`depth`/`reasoning`/
+  `communication` on 1–5, `strengths`/`gaps`, `followUpRecommended`,
+  `followUpReason`), and the compact prompt-input types
+  (`InterviewerPromptInput`, `EvaluatorPromptInput`) that carry only a
+  single-day curriculum context, never the full curriculum.
+- Implemented `services/llm.ts`:
+  - `resolveLlmConfig(env)` reads `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`
+    (required) and optional `LLM_TIMEOUT_MS`; missing config yields a typed
+    `not-configured` error, never a throw.
+  - `createLlmClient({ config?, transport?, env? })` exposes `chat(messages)`
+    over an injectable `ChatTransport` (default `fetchTransport` calls
+    `POST {baseUrl}/chat/completions` with a Bearer token and an
+    `AbortController` timeout). Transport errors map to typed
+    `network`/`timeout`/`http`/`invalid-output` errors; provider messages and
+    stack traces are never surfaced.
+  - `generateInterviewQuestion(input, client)` — exactly one LLM call — builds
+    the INTERVIEWER prompt (concise system prompt + compact user context with
+    candidate profile, planned question, objective, tools, bounded 6-turn
+    conversation window, optional prior evaluation for follow-up phrasing) and
+    validates the model output (`extractJsonObject` tolerates fences/prose;
+    question number + non-empty text required).
+- Implemented `services/evaluator.ts`: `evaluateAnswer(input, client)` — exactly
+  one LLM call — builds the EVALUATOR prompt (judge only against the stated
+  objective, accept valid alternatives, concise reasons, no chain-of-thought,
+  JSON-only) and validates the full `AnswerEvaluation` schema (enums, 1–5
+  integer scores, string arrays, booleans). Malformed JSON or schema violations
+  return typed `malformed-json`/`invalid-output` errors.
+- Follow-up support is a signal only (`followUpRecommended`/`followUpReason`);
+  the deterministic engine still controls question count and completion.
+- Updated `types/interview.ts` header and `types/api.ts` so API request/response
+  types reference the new `GeneratedQuestion`/`AnswerEvaluation` outputs.
+
+**Verification:** a temporary script (removed afterwards) verified prompt
+construction (planned question, objective, candidate context, bounded history;
+entire curriculum/candidate dataset never sent), question + evaluation schema
+validation, rejection of invalid JSON/enums/scores/arrays, HTTP/timeout/network
+and missing-config handling, no-secret-leakage, single-call-per-operation, and
+injected mock transport usage: 40 checks, 0 failures. No real provider calls
+and no API key required.
+
+**Explicitly deferred to later prompts (do not implement early):**
+
+- `POST /api/interview` API route behavior
+- Interview UI at `/interview`
+- Aggregate feedback generation/report
+- Deployment configuration beyond documenting environment variables
+
+**Status:** Complete.

@@ -1,8 +1,8 @@
 /**
  * Domain types for the interview runtime.
- * The planner decides WHAT to ask; the engine + memory (implemented) run the
- * interview lifecycle; the LLM service and evaluator consume these values in
- * later milestones.
+ * The planner decides WHAT to ask; the engine + memory run the interview
+ * lifecycle; the LLM service and evaluator consume these values to phrase
+ * questions and assess answers (see types/llm.ts).
  */
 
 import type { Candidate, CandidateAnalysis } from "@/types/candidate";
