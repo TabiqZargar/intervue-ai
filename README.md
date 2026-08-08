@@ -17,8 +17,10 @@ structured feedback through a simple HTTP API.
 
 - Project scaffold (Next.js, TypeScript, Tailwind CSS) — done
 - Landing page at `/` — done
-- Type definitions for curriculum, candidates, and interviews — done
-- Data placeholders (`data/curriculum.json`, `data/candidates.json`) — done
+- Supplied synthetic data (`data/curriculum.json`, `data/candidates.json`) — loaded as the source of truth
+- Typed curriculum data access (`getCurriculum`, `getDay`, `getModule`, `getDaysForModule`) — done
+- Typed candidate data access (`getCandidates`, `getCandidate`) — done
+- Deterministic candidate analysis (`analyzeCandidate`) — done
 - Interview planner, engine, memory, evaluator, LLM service — pending
 - `POST /api/interview` API route — pending
 - Interview UI at `/interview` — pending

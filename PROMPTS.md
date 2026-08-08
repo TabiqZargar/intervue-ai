@@ -36,3 +36,33 @@ logic, API behavior, or interview UI was implemented in this prompt.
   synthetic data)
 
 **Status:** Complete.
+
+## Prompt 2 — Data Services Layer
+
+**Goal:** Model the supplied curriculum and candidate data and expose typed,
+pure TypeScript data access. No interview planner, engine, evaluator, LLM
+integration, API behavior, or interview UI was implemented.
+
+**What was done:**
+
+- Confirmed `data/curriculum.json` (8 modules, 31 days) and
+  `data/candidates.json` (20 candidates) are present and treated as the source
+  of truth. Both files were left unmodified.
+- Modeled the real schemas in `types/curriculum.ts` (`Curriculum`, `CurriculumModule`, `CurriculumDay`) and `types/candidate.ts` (`Member`, `Candidate`, `Mission`, `CandidateSignals`, `CandidatesData`).
+- Represented skipped missions as a discriminated union (`SkippedMission` vs `AttemptedMission`) instead of assuming every mission has `passed`/`attempts`.
+- Implemented pure curriculum helpers in `lib/curriculum.ts`: `getCurriculum`, `getDay(dayNumber)`, `getModule(moduleNumber)`, `getDaysForModule(moduleNumber)` (resolves module `[start, end]` day ranges).
+- Implemented pure candidate helpers in `lib/candidates.ts`: `getCandidates`, `getCandidate(candidateId)`, `analyzeCandidate(candidate)`.
+- `analyzeCandidate` produces a compact, deterministic summary for the future
+  planner: profile, experience level, passed/failed/skipped missions,
+  high-attempt topics (attempts ≥ 4), first-try-passed strengths, counts, and
+  raw learning signals. No AI calls, LLM, embeddings, or vector database.
+- Updated `README.md` development status.
+
+**Explicitly deferred to later prompts (do not implement early):**
+
+- Interview planner, interview engine, memory, evaluator, LLM integration
+- `POST /api/interview` API route behavior
+- Interview UI at `/interview`
+- Feedback generation
+
+**Status:** Complete.
