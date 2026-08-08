@@ -5,8 +5,8 @@ multi-turn technical interviews personalized to a candidate's AI engineering
 learning journey. It plans a question sequence from a curriculum, runs the
 interview through an in-memory session engine, phrases questions and evaluates
 answers through a configurable runtime LLM service, and exposes everything
-through a simple HTTP API (`POST /api/interview`). The interview UI is an
-upcoming milestone.
+through a simple HTTP API (`POST /api/interview`). A mobile-first interview UI
+at `/interview` drives that API end to end.
 
 ## Pipeline
 
@@ -54,7 +54,7 @@ and never loops or ends early.
 - Structured answer evaluation (`evaluateAnswer`) — done (schema-validated output, follow-up signal, strict-to-objective judging)
 - `POST /api/interview` API route — done (start/continue/complete, typed request validation, deterministic feedback on completion)
 - Feedback generation (`buildFinalFeedback`) — done (deterministic aggregation from stored evaluations, no extra LLM call)
-- Interview UI at `/interview` — pending
+- Interview UI at `/interview` — done (mobile-first, candidate selection, typed API client, progress, error/retry, final feedback)
 - Feedback report page — pending
 
 ## HTTP API
@@ -116,6 +116,38 @@ Sessions are isolated per `sessionId` and live in process memory (no database).
 
 Errors never expose API keys, provider messages, stack traces, or internal
 prompts.
+
+## Interview UI (`/interview`)
+
+The interview experience at `/interview` is a mobile-first single-page flow
+(390px target, expands gracefully on desktop):
+
+1. **Choose a candidate** — pick a supplied candidate profile (name, role,
+   experience level, education, missions completed). No authentication.
+2. **Start Interview** — the client generates a unique `sessionId` and calls
+   `POST /api/interview` with the full candidate object; the welcome message
+   is shown.
+3. **Answer the questions** — every answer posts to the same `sessionId`. The
+   first answer triggers the first question; each reply is displayed with
+   strong visual hierarchy for interviewer messages. Progress (`Question N of
+   8`) is derived client-side from the conversation (the API exposes no
+   question index), and the composer disables submissions during requests.
+4. **Final feedback** — when the API returns `done: true`, the flow transitions
+   to an "Interview complete" screen with the exact `feedback.summary`,
+   `feedback.strengths`, `feedback.gaps`, and `feedback.next` fields. No
+   numeric score is invented (the API returns none).
+
+Implementation notes:
+
+- `lib/interview-api.ts` is the typed client for the endpoint. It validates
+  every response structurally, maps HTTP status codes and network failures to
+  human-safe messages (never server error text), and generates session ids.
+- State is local React state in `components/interview/` — no Redux/Zustand, no
+  new dependencies.
+- Failed answer submissions preserve the candidate's answer and offer
+  "Try again"; duplicate submissions are blocked during in-flight requests.
+- All questions come from the API; the client hard-codes no candidates,
+  questions, topics, or planner terminology.
 
 ## Environment Variables (server-side)
 

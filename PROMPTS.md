@@ -291,3 +291,72 @@ failures. Lint, `tsc --noEmit`, and `next build` all pass.
   (only environment-variable documentation is provided)
 
 **Status:** Complete.
+
+## Prompt 7 — Interview UI + API Integration
+
+**Goal:** Build the real interview experience at `/interview` — a mobile-first
+(390px) technical interview product that drives the existing `POST
+/api/interview` backend. The backend was not redesigned; no service files
+(`interview-engine`, `interview-service`, `memory`, `planner`, `llm`,
+`evaluator`, `feedback`) and no API contract changes were made.
+
+**What was done:**
+
+- `lib/interview-api.ts` — typed client for `POST /api/interview`:
+  - `startInterview(sessionId, candidate)` and `continueInterview(sessionId, message)`.
+  - Every response is validated structurally (`done: false` reply, or
+    `done: true` + `feedback.summary/strengths/gaps/next`); malformed bodies,
+    non-JSON responses, network failures, and HTTP statuses (400/404/500/502/503)
+    are normalized into human-safe messages. Server error text is never shown.
+  - `createSessionId()` — `crypto.randomUUID()` with a fallback for non-secure
+    contexts; a fresh id is generated per start attempt.
+- New `components/interview/` directory:
+  - `types.ts` — `ChatMessage`, `InterviewPhase` (selecting → starting →
+    active → submitting → completed), `CandidateOption` + `toCandidateOption`,
+    `experienceLabel` (mirrors the planner's experience derivation).
+  - `Spinner.tsx`, `InterviewHeader.tsx` (Intervue AI / Technical Interview +
+    candidate name/role/level), `ProgressIndicator.tsx` (Question N of 8,
+    derived client-side from conversation state; first interviewer message is
+    the welcome, so every later one is a question; no backend metadata), and
+    `CandidateSelector.tsx` (real candidate data via `getCandidates()`, no mock
+    dataset, no raw profile dump, aria-pressed cards, Start Interview).
+  - `MessageList.tsx` (interviewer messages with strong hierarchy + aria-live,
+    candidate answers right-aligned, auto-scroll to newest), `AnswerComposer.tsx`
+    (labeled accessible textarea, Enter inserts a newline and never submits,
+    explicit Submit button, disabled while in-flight), `ErrorBanner.tsx`
+    (role="alert", human message + Try again), `FeedbackPanel.tsx` (Summary /
+    Strengths / Areas to improve / Next steps stacked, using only the API's
+    `feedback` fields — no invented score).
+  - `InterviewClient.tsx` — the state machine (all 9 states: select, loading
+    first question, active, submitting, loading next, API error, retry,
+    completed, final feedback). A synchronous `busyRef` prevents duplicate
+    submissions; the draft is cleared only on success, so a failed submission
+    preserves the candidate's answer for retry. "Interview another candidate"
+    resets the session.
+- Rewrote `app/interview/page.tsx` as a server component that loads
+  `getCandidates()` and passes the data into the client component (page stays
+  static/SSG). Added a minimal `Start an interview` link on the landing page.
+- Updated `README.md` (interview UI user flow + implementation notes) and this
+  prompt log.
+
+**Verification:**
+
+- Temporary script (removed afterwards) unit-tested `lib/interview-api.ts` with
+  a mocked `fetch`: start/continue success, final feedback shape, malformed
+  JSON/body/feedback, 400/404/502/503 → generic messages with no internal leak
+  (server error text never surfaced), network failure, unique session ids:
+  21 checks, 0 failures.
+- SSR smoke test of the production build: `GET /interview` returns 200 and
+  server-renders the candidate selector with real candidate data and the
+  Start button.
+- `npm run lint`, `npx tsc --noEmit`, and `next build` all pass; `/interview`
+  is prerendered as static content.
+
+**Explicitly deferred to later prompts (do not implement early):**
+
+- Landing page redesign, deployment, authentication, database
+- Recruiter/dashboard/admin pages, voice, social integrations
+- New agents or new backend architecture (the fixed 8-question contract is
+  consumed as-is; the UI invents no topics or scores)
+
+**Status:** Complete.

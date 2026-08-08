@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
     <main className="flex flex-1 items-center justify-center px-6 py-24">
@@ -15,9 +17,12 @@ export default function Home() {
           Personalized technical interviews based on your AI engineering learning
           journey.
         </p>
-        <p className="text-sm text-zinc-400 dark:text-zinc-600">
-          The interview experience is coming soon.
-        </p>
+        <Link
+          href="/interview"
+          className="rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60"
+        >
+          Start an interview
+        </Link>
       </div>
     </main>
   );
