@@ -21,7 +21,8 @@ structured feedback through a simple HTTP API.
 - Typed curriculum data access (`getCurriculum`, `getDay`, `getModule`, `getDaysForModule`) — done
 - Typed candidate data access (`getCandidates`, `getCandidate`) — done
 - Deterministic candidate analysis (`analyzeCandidate`) — done
-- Interview planner, engine, memory, evaluator, LLM service — pending
+- Deterministic interview planner (`createInterviewPlan`) — done (8 questions, 4+ curriculum days, personalized via candidate signals)
+- Interview engine, memory, evaluator, LLM service — pending
 - `POST /api/interview` API route — pending
 - Interview UI at `/interview` — pending
 - Feedback generation — pending
