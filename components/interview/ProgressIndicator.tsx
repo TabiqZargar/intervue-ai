@@ -32,25 +32,25 @@ export function ProgressIndicator({
   return (
     <div
       aria-label={`${label} · ${percentage}% complete`}
-      className="rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900"
+      className="rounded-xl border border-zinc-200 bg-white px-4 py-4 dark:border-zinc-800 dark:bg-zinc-900"
     >
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+        <p className="text-base font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
           {label}
         </p>
-        <p className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
+        <p className="text-sm font-medium tabular-nums text-indigo-600 dark:text-indigo-400">
           {percentage}%
         </p>
       </div>
       <div
-        className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800"
+        className="mt-3 h-2 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800"
         role="progressbar"
         aria-valuenow={percentage}
         aria-valuemin={0}
         aria-valuemax={100}
       >
         <div
-          className="h-full rounded-full bg-indigo-500 transition-all duration-300"
+          className="h-full rounded-full bg-indigo-500 transition-all duration-300 ease-out"
           style={{ width: `${percentage}%` }}
         />
       </div>

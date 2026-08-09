@@ -17,22 +17,22 @@ export function Comparison() {
   return (
     <section
       aria-labelledby="why-intervue-heading"
-      className="mx-auto w-full max-w-5xl px-4 py-12"
+      className="mx-auto w-full max-w-5xl px-4 py-16 sm:py-20"
     >
       <div className="max-w-2xl">
         <h2
           id="why-intervue-heading"
-          className="text-xl font-semibold tracking-tight text-zinc-900 sm:text-2xl dark:text-zinc-50"
+          className="text-2xl font-semibold tracking-tight text-zinc-900 sm:text-3xl dark:text-zinc-50"
         >
           Why Intervue AI
         </h2>
-        <p className="mt-2 text-sm leading-6 text-zinc-600 sm:text-base sm:leading-7 dark:text-zinc-400">
+        <p className="mt-3 text-sm leading-6 text-zinc-600 sm:text-base sm:leading-7 dark:text-zinc-400">
           A scripted quiz repeats the same questions. Intervue AI interviews —
           it reads your journey and adapts as you answer.
         </p>
       </div>
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-2">
+      <div className="mt-8 grid gap-4 sm:grid-cols-2">
         <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 dark:border-zinc-800 dark:bg-zinc-900">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
             Scripted quiz
