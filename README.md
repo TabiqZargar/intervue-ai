@@ -3,10 +3,10 @@
 Intervue AI is an adaptive AI technical interview agent that conducts realistic,
 multi-turn technical interviews personalized to a candidate's AI engineering
 learning journey. It plans a question sequence from a curriculum, runs the
-interview through an in-memory session engine, phrases questions and evaluates
-answers through a configurable runtime LLM service, and exposes everything
-through a simple HTTP API (`POST /api/interview`). A mobile-first interview UI
-at `/interview` drives that API end to end.
+interview through a session engine (Upstash Redis-backed in production), phrases
+questions and evaluates answers through a configurable runtime LLM service, and
+exposes everything through a simple HTTP API (`POST /api/interview`). A
+mobile-first interview UI at `/interview` drives that API end to end.
 
 ## Problem Statement
 
@@ -24,7 +24,7 @@ Candidate
    → deterministic candidate analysis (analyzeCandidate)
    → personalized interview planning (createInterviewPlan)
    → interview state engine (createInterviewEngine)
-   → session memory (createMemory) → conversation turns
+   → session store (createSessionStore: Upstash Redis in production, in-memory in local dev)
    → next-question decision (follow-up slot vs. next planned question)
    → LLM service (generateInterviewQuestion — question phrasing)
    → evaluator (evaluateAnswer — structured assessment + follow-up signal)
@@ -46,7 +46,8 @@ and never loops or ends early.
 - Tailwind CSS
 - Local JSON data for curriculum and candidates
 - Configurable OpenAI-compatible LLM runtime (no provider hard-coded)
-- No database, no authentication
+- Upstash Redis (REST) for durable session storage in production; in-memory fallback for local dev
+- No authentication
 
 ## Development Status
 
@@ -57,7 +58,7 @@ and never loops or ends early.
 - Typed candidate data access (`getCandidates`, `getCandidate`) — done
 - Deterministic candidate analysis (`analyzeCandidate`) — done
 - Deterministic interview planner (`createInterviewPlan`) — done (8 questions, 4+ curriculum days, personalized via candidate signals)
-- Short-term conversation memory (`createMemory`) — done (in-memory session store, `Map`-backed, no persistence)
+- Session store (`createSessionStore`) — done (Upstash Redis in production via `UPSTASH_REDIS_REST_URL`/`UPSTASH_REDIS_REST_TOKEN`, in-memory fallback for local dev; a typed `MemoryStoreError` keeps a store outage a controlled 500 rather than a "session no longer active")
 - Interview state engine (`createInterviewEngine`) — done (start/continue/complete lifecycle, typed results for the future API)
 - Configurable runtime LLM service (`createLlmClient`, `generateInterviewQuestion`) — done (OpenAI-compatible chat completions, injectable transport, typed errors, env-var configuration)
 - Structured answer evaluation (`evaluateAnswer`) — done (schema-validated output, follow-up signal, strict-to-objective judging)
@@ -120,8 +121,10 @@ Turn semantics:
 
 Status codes: `200` success · `400` invalid body / duplicate `sessionId` /
 answer to a completed session · `404` unknown `sessionId` · `500` internal or
-invalid LLM output · `502` LLM provider failure · `503` LLM not configured.
-Sessions are isolated per `sessionId` and live in process memory (no database).
+invalid LLM output or session-store outage · `502` LLM provider failure ·
+`503` LLM not configured. Sessions are isolated per `sessionId` and persist in
+Upstash Redis in production (surviving serverless invocations and restarts);
+in local development without Redis configuration they live in process memory.
 
 Errors never expose API keys, provider messages, stack traces, or internal
 prompts.
@@ -183,8 +186,8 @@ Implementation notes:
 
 ## Environment Variables (server-side)
 
-The LLM provider is intentionally configurable and selected at deployment.
-These are **server-side** environment variables — never put secrets in
+The LLM provider and the session store are configured at deployment. These are
+**server-side** environment variables — never put secrets in
 `NEXT_PUBLIC_*` variables.
 
 ```bash
@@ -194,10 +197,25 @@ LLM_MODEL=      # model identifier, e.g. gpt-4o-mini
 LLM_TIMEOUT_MS= # optional, request timeout in ms (default 30000)
 ```
 
+Session persistence uses Upstash Redis (REST), which requires both variables
+(obtained from your Upstash database's REST settings):
+
+```bash
+UPSTASH_REDIS_REST_URL=   # e.g. https://<name>-<region>.upstash.io
+UPSTASH_REDIS_REST_TOKEN= # Upstash REST API token (never commit this)
+```
+
 If `LLM_BASE_URL`, `LLM_API_KEY`, or `LLM_MODEL` are missing, the service
 returns a typed `not-configured` error instead of throwing. Any OpenAI-compatible
 chat-completions provider can be used by pointing the variables at it. The
-service never logs or surfaces API keys, authorization headers, or stack traces.
+service never logs or surfaces API keys, authorization headers, stack traces,
+or Redis credentials.
+
+Session store selection is explicit: when both `UPSTASH_REDIS_REST_URL` and
+`UPSTASH_REDIS_REST_TOKEN` are set, sessions persist in Upstash Redis. In a
+non-production environment without them, the app falls back to its in-memory
+store for local development. In **production**, missing Redis configuration is
+a hard error — the app fails fast rather than silently losing sessions.
 
 ## Getting Started
 
@@ -221,24 +239,34 @@ landing page.
 - `npm run lint` (ESLint) and `npx tsc --noEmit` (TypeScript) gate every
   change; `npm run build` verifies the production bundle and route table
   (`/` and `/interview` static, `/api/interview` dynamic/server-side).
-- Deterministic verification of the planner, engine, memory, and feedback
-  aggregation (exactly 8 questions, 4+ curriculum days, bounded follow-ups,
-  session isolation, feedback shape) runs via temporary scripts that are
-  removed after each audit; the service/API layer is exercised the same way
-  with a stubbed LLM client (all status codes, retry-safety, no-secret leaks).
-- A production SSR smoke check confirms `/` and `/interview` render with real
-  data. End-to-end API tests against the live LLM provider are optional and
-  depend on the provider accepting requests (see Deployment).
+- Deterministic verification of the planner, engine, session store, and
+  feedback aggregation (exactly 8 questions, 4+ curriculum days, bounded
+  follow-ups, session isolation, Redis round-trips, unknown-vs-outage
+  distinction, feedback shape) runs via temporary scripts that are removed
+  after each audit; the session store is exercised against a mocked Upstash
+  Redis client (no live database, no real LLM calls).
+- The service/API layer is exercised the same way with a stubbed LLM client
+  (all status codes, retry-safety, no-secret leaks) over the Redis-backed
+  store.
+- A dev-server API smoke check confirms `POST /api/interview` start/duplicate/
+  unknown/validation behavior and that a provider outage maps to a safe 502.
+  End-to-end API tests against the live LLM provider are optional and depend on
+  the provider accepting requests (see Deployment).
 
 ## Deployment
 
 1. `npm install`, then `npm run build`.
 2. Set the server-side variables below (in `.env.local` locally, or as
-   platform secrets on the host — never `NEXT_PUBLIC_*`).
-3. Run `npm run start` (or `next start -p <port>`) on a single instance.
-4. Session state is held in process memory, so route all traffic to one
-   instance and expect sessions to reset on restart. No database is used.
+   platform secrets on the host — never `NEXT_PUBLIC_*`): the LLM variables
+   plus `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` (from an
+   Upstash Redis database).
+3. Run `npm run start` (or `next start -p <port>`). Because sessions persist
+   in Upstash Redis, the app works across serverless invocations and restarts;
+   there is no single-instance requirement and no process-memory reset.
 
-Sessions are isolated per `sessionId` and live only in process memory. The app
-does not deploy, push, or register the team's repository by itself — those are
-steps the team performs after submission.
+Sessions are isolated per `sessionId` and stored as JSON under
+`intervue-ai:session:<sessionId>` keys in Upstash Redis in production. Without
+Redis configuration in production the app refuses to start serving sessions
+(fail fast) instead of silently using memory. The app does not deploy, push, or
+register the team's repository by itself — those are steps the team performs
+after submission.

@@ -9,6 +9,7 @@ import {
   resolveContinueState,
   type InterviewEngine,
 } from "@/services/interview-engine";
+import { isMemoryStoreError } from "@/services/memory";
 import {
   generateInterviewQuestion,
   type LlmClient,
@@ -66,16 +67,24 @@ export function createInterviewService(
           "request body must be a session start (sessionId + candidate) or a continuation (sessionId + message)",
         );
       }
-      return parsed.kind === "start"
-        ? handleStart(parsed)
-        : handleContinue(parsed);
+      try {
+        return parsed.kind === "start"
+          ? await handleStart(parsed)
+          : await handleContinue(parsed);
+      } catch (err) {
+        // A session-store outage is a controlled 500, never "no session found".
+        if (isMemoryStoreError(err)) {
+          return storageError();
+        }
+        throw err;
+      }
     },
   };
 
   async function handleStart(
     parsed: Extract<ParsedInterviewRequest, { kind: "start" }>,
   ): Promise<InterviewServiceResult> {
-    const result = options.engine.startInterview(parsed.candidate, {
+    const result = await options.engine.startInterview(parsed.candidate, {
       sessionId: parsed.sessionId,
     });
     if (!result.ok) {
@@ -87,7 +96,7 @@ export function createInterviewService(
   async function handleContinue(
     parsed: Extract<ParsedInterviewRequest, { kind: "continue" }>,
   ): Promise<InterviewServiceResult> {
-    const session = options.engine.getSession(parsed.sessionId);
+    const session = await options.engine.getSession(parsed.sessionId);
     if (!session) {
       return notFound(`no interview session found for "${parsed.sessionId}"`);
     }
@@ -116,7 +125,7 @@ export function createInterviewService(
       return generated.error;
     }
 
-    options.engine.setCurrentQuestionText(session.sessionId, generated.text);
+    await options.engine.setCurrentQuestionText(session.sessionId, generated.text);
     return { status: 200, body: { reply: generated.text, done: false } };
   }
 
@@ -152,7 +161,7 @@ export function createInterviewService(
         return generated.error;
       }
 
-      const commit = options.engine.continueInterview(
+      const commit = await options.engine.continueInterview(
         session.sessionId,
         message,
         { evaluation: evaluation.value },
@@ -167,12 +176,12 @@ export function createInterviewService(
         return internalError("question resolution diverged from the engine");
       }
 
-      options.engine.setCurrentQuestionText(session.sessionId, generated.text);
+      await options.engine.setCurrentQuestionText(session.sessionId, generated.text);
       return { status: 200, body: { reply: generated.text, done: false } };
     }
 
     // No further questions: this answer completes the interview.
-    const commit = options.engine.continueInterview(
+    const commit = await options.engine.continueInterview(
       session.sessionId,
       message,
       { evaluation: evaluation.value },
@@ -299,6 +308,13 @@ function badRequest(message: string): InterviewServiceResult {
 
 function internalError(message: string): InterviewServiceResult {
   return { status: 500, body: errorBody(message) };
+}
+
+function storageError(): InterviewServiceResult {
+  return {
+    status: 500,
+    body: errorBody("interview session store is temporarily unavailable"),
+  };
 }
 
 function errorBody(message: string): InterviewErrorResponse {

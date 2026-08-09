@@ -559,3 +559,91 @@ changes, no commits, no git-history changes, no modifications or exposure of
 - Authentication, database/persistence, new features
 
 **Status:** Complete.
+
+## Prompt 11 — Durable Session Storage with Upstash Redis
+
+**Goal:** Replace the Vercel-unreliable in-memory session storage with Upstash
+Redis persistence so interviews survive serverless invocations (the previous
+behavior could fail mid-interview with "This interview session is no longer
+active."). No architecture/API/engine/planner/LLM/evaluator/data changes; the
+8-question / 4+ curriculum-day / bounded-follow-up guarantees, retry-safe
+transitions, the memory abstraction, and all frontend behavior are preserved.
+No auth, no new features, no complex schema. Stop after the report — no
+commit/push/deploy.
+
+**What was done:**
+
+- **Dependency:** added `@upstash/redis` (only new dependency). Server-side
+  env vars `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`; never
+  exposed to client code.
+- **`services/memory.ts` rewrite:** the `MemoryStore` interface keeps the same
+  methods (`createSession`, `getSession`, `updateSession`, `appendTurn`,
+  `completeSession`, `deleteSession`, `clear`) but is now asynchronous so a
+  remote store is possible. Added `createRedisSessionStore(redis)` storing each
+  session as JSON under `intervue-ai:session:<sessionId>`, an in-memory
+  fallback (`createMemory`), and a factory `createSessionStore(options)` with
+  explicit environment detection: Redis when both env vars are present;
+  in-memory in non-production without them; and a hard
+  `SessionStoreConfigurationError` in production without them (fail fast —
+  production never silently runs on memory).
+- **Typed failures:** a `MemoryStoreError` (code `storage-failure`, generic
+  message, cause kept server-side only) is thrown for read/write failures and
+  corrupted payloads; "session not found" is still signalled with `undefined`
+  — a Redis outage can never be misreported as "no longer active". A
+  property-based `isMemoryStoreError` guard is used instead of `instanceof` so
+  dual CJS/ESM module graphs (and bundlers) cannot break error detection.
+- **`services/interview-engine.ts`:** all methods are async and await the
+  store; `resolveContinueState` remains pure and the state machine is
+  unchanged. The default singleton is now lazily constructed via
+  `getInterviewEngine()` so a production build (which runs in `NODE_ENV=
+  production` without the env vars) never fails at route-module evaluation —
+  the store is only instantiated when a request arrives.
+- **`services/interview-service.ts` + `app/api/interview/route.ts`:**
+  orchestration awaits the async engine; `MemoryStoreError` is mapped to a
+  controlled `500` with the safe message "interview session store is
+  temporarily unavailable" (never 404, never a stack trace, never Redis
+  credentials). The API contract and status codes are unchanged.
+- **README:** updated Pipeline, Technology Stack, Development Status, HTTP
+  API, Environment Variables (added the two Upstash vars, server-side only),
+  Testing, and Deployment (no more single-instance / process-memory caveat);
+  documents the explicit dev-vs-production store selection.
+- Appended this truthful Prompt 11 entry.
+
+**Verification:**
+
+- Temporary script with a mocked Upstash Redis client (no live database, no
+  real LLM calls): 98 checks, 0 failures, covering the required items —
+  create/get, mutate/get-latest, appendTurn, complete, delete, session
+  isolation + clear, unknown-vs-outage distinction (undefined vs
+  `MemoryStoreError`, corrupt payload, no credential/stack leak in errors),
+  the engine over the Redis store (full 8-answer run, bounded follow-up,
+  `resolveContinueState` purity, outage → `MemoryStoreError` not
+  `session-not-found`), planner guarantees for all 20 candidates (8 questions,
+  4+ days), the API service over the Redis store with a stubbed LLM (welcome,
+  full completion + feedback shape, 404 vs 500-on-outage, duplicate 400,
+  invalid candidates 400, completed 400, provider-failure 502 retry-safe with
+  no double-count, empty message 200, not-configured 503), factory selection
+  (explicit injection, production-without-Redis refuses memory, production-
+  with-vars builds a store, local-dev falls back to memory), and the lazy
+  singleton.
+- `npm run lint`, `npx tsc --noEmit`, and `npm run build` all pass. Route
+  table: `/` static, `/interview` static, `/api/interview` dynamic/server-side.
+- Secrets scan over all tracked files: clean. Client-bundle scan: no
+  `UPSTASH_REDIS_*`, no `sk-` keys, no `@upstash/redis`/memory module in the
+  browser bundle (`process.env` is read only in `services/llm.ts` and
+  `services/memory.ts`, both server-side).
+- Dev-server API smoke (`POST /api/interview`): start → 200 exact welcome,
+  duplicate session → 400, unknown session → 404, invalid body → 400, and the
+  continue request → controlled 502 (the live LLM provider remained HTTP 429
+  rate-limited as in Prompt 10) with no secret/stack leak — full live
+  completion is still blocked by the provider quota and is covered by the
+  stub-verified checks.
+
+**Explicitly deferred to later prompts (do not implement early):**
+
+- Actual deployment, git push, team registration (human steps)
+- Authentication, new interview features
+- A live Upstash database end-to-end check (requires real credentials) and
+  Vercel env configuration (human steps)
+
+**Status:** Complete.

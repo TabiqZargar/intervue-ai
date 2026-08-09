@@ -1,6 +1,9 @@
 import { analyzeCandidate } from "@/lib/candidates";
 import { createInterviewPlan } from "@/services/planner";
-import { createMemory, type MemoryStore } from "@/services/memory";
+import {
+  createSessionStore,
+  type MemoryStore,
+} from "@/services/memory";
 import type { Candidate } from "@/types/candidate";
 import type { PlannedQuestion, InterviewPlan } from "@/types/planner";
 import type { AnswerEvaluation } from "@/types/llm";
@@ -33,17 +36,25 @@ export interface InterviewEngine {
   startInterview(
     candidate: Candidate,
     options?: { sessionId?: string },
-  ): StartInterviewResult;
+  ): Promise<StartInterviewResult>;
   continueInterview(
     sessionId: string,
     answer: string,
     context?: { evaluation?: AnswerEvaluation },
-  ): ContinueInterviewResult;
+  ): Promise<ContinueInterviewResult>;
   /** Records the natural-language text of the currently active question. */
-  setCurrentQuestionText(sessionId: string, text: string): boolean;
-  getSession(sessionId: string): InterviewSession | undefined;
-  deleteSession(sessionId: string): boolean;
+  setCurrentQuestionText(sessionId: string, text: string): Promise<boolean>;
+  getSession(sessionId: string): Promise<InterviewSession | undefined>;
+  deleteSession(sessionId: string): Promise<boolean>;
 }
+
+/**
+ * Storage failure contract: when the underlying session store cannot serve a
+ * read or write, engine methods reject with `MemoryStoreError` (a controlled,
+ * secret-free typed error). "Session not found" is always signalled with
+ * `undefined` / `session-not-found` — never by throwing — so a store outage
+ * cannot be confused with a missing or completed session.
+ */
 
 /**
  * Next state after a candidate answer, computed deterministically from the
@@ -145,7 +156,7 @@ export function resolveContinueState(
 
 export function createInterviewEngine(memory: MemoryStore): InterviewEngine {
   return {
-    startInterview(candidate, options) {
+    async startInterview(candidate, options) {
       const analysis = analyzeCandidate(candidate);
       const plan = createInterviewPlan(candidate);
 
@@ -162,7 +173,10 @@ export function createInterviewEngine(memory: MemoryStore): InterviewEngine {
       }
 
       const sessionId = options?.sessionId ?? generateSessionId();
-      if (options?.sessionId !== undefined && memory.getSession(sessionId)) {
+      if (
+        options?.sessionId !== undefined &&
+        (await memory.getSession(sessionId))
+      ) {
         return error(
           "session-already-exists",
           `an interview session for "${sessionId}" already exists`,
@@ -185,7 +199,7 @@ export function createInterviewEngine(memory: MemoryStore): InterviewEngine {
         status: "active",
       };
 
-      memory.createSession(session);
+      await memory.createSession(session);
 
       return {
         ok: true,
@@ -195,8 +209,8 @@ export function createInterviewEngine(memory: MemoryStore): InterviewEngine {
       };
     },
 
-    continueInterview(sessionId, answer, context) {
-      const session = memory.getSession(sessionId);
+    async continueInterview(sessionId, answer, context) {
+      const session = await memory.getSession(sessionId);
       if (!session) {
         return error(
           "session-not-found",
@@ -220,7 +234,7 @@ export function createInterviewEngine(memory: MemoryStore): InterviewEngine {
         : session.plan.questions[session.currentQuestionIndex];
 
       if (!spec) {
-        const completed = memory.completeSession(
+        const completed = await memory.completeSession(
           sessionId,
           new Date().toISOString(),
         );
@@ -238,7 +252,7 @@ export function createInterviewEngine(memory: MemoryStore): InterviewEngine {
         answer,
         evaluation,
       );
-      const updated = memory.appendTurn(sessionId, turn);
+      const updated = await memory.appendTurn(sessionId, turn);
       if (!updated) {
         return error(
           "session-not-found",
@@ -248,7 +262,7 @@ export function createInterviewEngine(memory: MemoryStore): InterviewEngine {
 
       const state = resolveContinueState(updated, evaluation);
       if (state.completed) {
-        const completed = memory.completeSession(
+        const completed = await memory.completeSession(
           sessionId,
           new Date().toISOString(),
         );
@@ -259,24 +273,24 @@ export function createInterviewEngine(memory: MemoryStore): InterviewEngine {
         };
       }
 
-      memory.updateSession({ ...updated, ...state.sessionChanges });
+      await memory.updateSession({ ...updated, ...state.sessionChanges });
       return { ok: true, done: false, question: state.next as PlannedQuestion };
     },
 
-    setCurrentQuestionText(sessionId, text) {
-      const session = memory.getSession(sessionId);
+    async setCurrentQuestionText(sessionId, text) {
+      const session = await memory.getSession(sessionId);
       if (!session) {
         return false;
       }
-      memory.updateSession({ ...session, currentQuestionText: text });
+      await memory.updateSession({ ...session, currentQuestionText: text });
       return true;
     },
 
-    getSession(sessionId) {
+    async getSession(sessionId) {
       return memory.getSession(sessionId);
     },
 
-    deleteSession(sessionId) {
+    async deleteSession(sessionId) {
       return memory.deleteSession(sessionId);
     },
   };
@@ -337,7 +351,18 @@ function generateSessionId(): string {
 }
 
 /**
- * Default in-memory engine instance for server-side use. A fresh engine (with
- * its own memory) can be created via createInterviewEngine(createMemory()).
+ * Default server-side engine singleton. Constructed lazily so route-module
+ * evaluation during a production build never instantiates the session store:
+ * `createSessionStore()` fails fast when production is missing the Upstash
+ * Redis configuration, and that check must only run when a request arrives.
+ * A fresh engine (with its own store) can be created via
+ * `createInterviewEngine(createSessionStore())`.
  */
-export const interviewEngine = createInterviewEngine(createMemory());
+let engineSingleton: InterviewEngine | undefined;
+
+export function getInterviewEngine(): InterviewEngine {
+  if (!engineSingleton) {
+    engineSingleton = createInterviewEngine(createSessionStore());
+  }
+  return engineSingleton;
+}

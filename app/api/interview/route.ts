@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { interviewEngine } from "@/services/interview-engine";
+import { getInterviewEngine } from "@/services/interview-engine";
+import {
+  isMemoryStoreError,
+  isSessionStoreConfigurationError,
+} from "@/services/memory";
 import { createLlmClient } from "@/services/llm";
 import { createInterviewService } from "@/services/interview-service";
 
@@ -16,13 +20,11 @@ import { createInterviewService } from "@/services/interview-service";
  *         404 unknown session, 500 internal, 502 provider failure,
  *         503 LLM not configured.
  *
- * The route stays thin; orchestration lives in the interview service.
+ * The route stays thin; orchestration lives in the interview service. The
+ * engine and LLM client are constructed per request so the session store is
+ * only instantiated at runtime (its configuration fails fast in production
+ * when Redis is missing) and never during route-module evaluation.
  */
-const interviewService = createInterviewService({
-  engine: interviewEngine,
-  client: createLlmClient(),
-});
-
 export async function POST(request: Request) {
   let body: unknown;
   try {
@@ -34,6 +36,24 @@ export async function POST(request: Request) {
     );
   }
 
-  const result = await interviewService.handle(body);
-  return NextResponse.json(result.body, { status: result.status });
+  const interviewService = createInterviewService({
+    engine: getInterviewEngine(),
+    client: createLlmClient(),
+  });
+
+  try {
+    const result = await interviewService.handle(body);
+    return NextResponse.json(result.body, { status: result.status });
+  } catch (err) {
+    // Defense in depth: a session-store outage or missing production Redis
+    // configuration is a controlled 500, never a thrown stack trace or store
+    // internals, and never "session no longer active".
+    if (isMemoryStoreError(err) || isSessionStoreConfigurationError(err)) {
+      return NextResponse.json(
+        { error: "interview session store is temporarily unavailable" },
+        { status: 500 },
+      );
+    }
+    throw err;
+  }
 }
