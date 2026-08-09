@@ -280,7 +280,17 @@ export function createSessionStore(options: SessionStoreOptions = {}): MemorySto
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
   if (url && token) {
-    return createRedisSessionStore(new Redis({ url, token }));
+    return createRedisSessionStore(
+      new Redis({
+        url,
+        token,
+        // Sessions are stored as opaque JSON strings and parsed by the store
+        // itself (readSession), so the client must not auto-deserialize `get`
+        // results (the default is `true`): `readSession` would otherwise call
+        // `JSON.parse` on an already-parsed object and fail with a SyntaxError.
+        automaticDeserialization: false,
+      }),
+    );
   }
 
   if (process.env.NODE_ENV === "production") {

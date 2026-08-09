@@ -58,7 +58,7 @@ and never loops or ends early.
 - Typed candidate data access (`getCandidates`, `getCandidate`) — done
 - Deterministic candidate analysis (`analyzeCandidate`) — done
 - Deterministic interview planner (`createInterviewPlan`) — done (8 questions, 4+ curriculum days, personalized via candidate signals)
-- Session store (`createSessionStore`) — done (Upstash Redis in production via `UPSTASH_REDIS_REST_URL`/`UPSTASH_REDIS_REST_TOKEN`, in-memory fallback for local dev; a typed `MemoryStoreError` keeps a store outage a controlled 500 rather than a "session no longer active")
+- Session store (`createSessionStore`) — done (Upstash Redis in production via `UPSTASH_REDIS_REST_URL`/`UPSTASH_REDIS_REST_TOKEN`, in-memory fallback for local dev; a typed `MemoryStoreError` keeps a store outage a controlled 500 rather than a "session no longer active"; the Redis client disables `@upstash/redis` automatic JSON deserialization so sessions round-trip as the opaque JSON strings the store parses itself)
 - Interview state engine (`createInterviewEngine`) — done (start/continue/complete lifecycle, typed results for the future API)
 - Configurable runtime LLM service (`createLlmClient`, `generateInterviewQuestion`) — done (OpenAI-compatible chat completions, injectable transport, typed errors, env-var configuration)
 - Structured answer evaluation (`evaluateAnswer`) — done (schema-validated output, follow-up signal, strict-to-objective judging)
@@ -217,6 +217,10 @@ non-production environment without them, the app falls back to its in-memory
 store for local development. In **production**, missing Redis configuration is
 a hard error — the app fails fast rather than silently losing sessions.
 
+The production Redis client is created with `automaticDeserialization: false`
+(`@upstash/redis` otherwise JSON-parses every `get` result, which would break
+the store's own explicit `JSON.parse` of the stored session string).
+
 ## Getting Started
 
 ```bash
@@ -244,7 +248,12 @@ landing page.
   follow-ups, session isolation, Redis round-trips, unknown-vs-outage
   distinction, feedback shape) runs via temporary scripts that are removed
   after each audit; the session store is exercised against a mocked Upstash
-  Redis client (no live database, no real LLM calls).
+  Redis client (no live database, no real LLM calls). The store mock returns
+  raw strings, matching the client's `automaticDeserialization: false`
+  behavior; the Prompt 12 regression check additionally ran the real
+  `@upstash/redis` client against a local mock of the Upstash REST protocol to
+  confirm `get` returns the raw session JSON string (and that the previously
+  defaulted automatic JSON deserialization no longer double-parses it).
 - The service/API layer is exercised the same way with a stubbed LLM client
   (all status codes, retry-safety, no-secret leaks) over the Redis-backed
   store.

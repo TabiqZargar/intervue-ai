@@ -49,6 +49,7 @@ export async function POST(request: Request) {
     // configuration is a controlled 500, never a thrown stack trace or store
     // internals, and never "session no longer active".
     if (isMemoryStoreError(err) || isSessionStoreConfigurationError(err)) {
+      console.error(`[interview] session store error: ${err.name}: ${err.message}`);
       return NextResponse.json(
         { error: "interview session store is temporarily unavailable" },
         { status: 500 },

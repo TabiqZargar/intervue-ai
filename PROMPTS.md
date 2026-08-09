@@ -647,3 +647,62 @@ commit/push/deploy.
   Vercel env configuration (human steps)
 
 **Status:** Complete.
+
+## Prompt 12 — Fix Production 500 on Continue (Upstash JSON Auto-Deserialization)
+
+**Goal:** Diagnose the production-only symptom after the Prompt 11 deployment:
+the first `POST /api/interview` (start) returned 200 but the second (continue)
+returned HTTP 500. No architecture/API/engine/planner/LLM/evaluator/frontend
+changes, no new dependencies, no data migration. Stop after the report — no
+commit/push/deploy.
+
+**Symptom evidence:** Vercel logs for the failing invocation show
+`POST logical-fly-174174.upstash.io/pipeline` and no external Gemini call —
+the failure happened inside the session store (after the Redis round-trip,
+before the LLM step).
+
+**Root cause:** `@upstash/redis` (v1.38.2) enables **automatic JSON
+deserialization by default** (`automaticDeserialization: true`): every command
+result is passed through `parseResponse`/`JSON.parse`. It also enables
+**auto-pipelining by default**, so commands are batched through `POST
+/pipeline` (which is exactly what the Vercel log shows). The store
+(`services/memory.ts`) writes each session as an opaque JSON string and reads
+it back with `redis.get<string>` followed by an explicit `JSON.parse(raw)`. On
+a real client, `get` therefore returned an **already-parsed object**, and
+`JSON.parse(object)` coerces the object to `"[object Object]"`, throwing a
+`SyntaxError`. `readSession` wraps that in a `MemoryStoreError`, and the route
+maps it to the controlled 500. The write path was unaffected because `set`
+returns `"OK"` (not JSON), which is why start worked but continue failed. The
+Prompt 11 mock suite passed because its mock returned raw strings — the mock
+inadvertently modeled `automaticDeserialization: false`, masking the real
+client behavior.
+
+**What was done:**
+
+- **`services/memory.ts`:** the production Redis client is now constructed with
+  `automaticDeserialization: false` in `createSessionStore`, so `get` returns
+  the raw stored JSON string exactly as the store's explicit `JSON.parse` +
+  shape validation expects. Sessions already stored in production Redis are raw
+  JSON strings (`set` was unaffected), so no migration was needed.
+- **`app/api/interview/route.ts`:** the memory-store 500 branch now logs a safe
+  server-side diagnostic (`err.name` + `err.message` only — both generic, no
+  session data, secrets, or stack traces); the client response is unchanged.
+
+**Verification:**
+
+- A temporary script ran a **real `@upstash/redis` client against a mock
+  Upstash REST server** (no live database, no LLM calls): reproduced the bug
+  exactly — `get` returned an object, `JSON.parse` on it threw `SyntaxError`,
+  `createRedisSessionStore.getSession` surfaced `MemoryStoreError`, and all
+  traffic went through `/pipeline` matching the production log — then confirmed
+  the fix via `createRedisSessionStore` and the production factory path
+  (`createSessionStore` from env vars): get/append-turn/unknown-404/complete/
+  delete all round-trip. 11 checks, 0 failures.
+- The full Prompt 11 suite (98 mocked checks) still passes; `npm run lint`,
+  `npx tsc --noEmit`, and `npm run build` all pass; `/api/interview` remains
+  dynamic/server-side.
+
+**Deferred (human steps, unchanged from Prompt 11):** real deployment, git
+push, Vercel/Upstash env configuration, live end-to-end confirmation.
+
+**Status:** Complete.
