@@ -418,3 +418,73 @@ cleanly into `/interview`. No backend, API, or data changes.
 - Backend architecture changes or unnecessary refactors
 
 **Status:** Complete.
+
+## Prompt 9 — Final Hardening, Compliance Audit & QA
+
+**Goal:** Final hardening pass. Preserve the delivered API contract and the
+8-question / 4+ curriculum-day guarantees, fix only real
+correctness/compliance/reliability/actionable-feedback issues, run the full QA
+gates, update docs, and report. No architecture changes, no data changes, no
+new dependencies, no deployment, and no commits.
+
+**What was done:**
+
+- **Full audit (STEP 1):** read every type, lib, service, the API route, and
+  the interview/landing components; traced the whole flow
+  (analyzeCandidate → createInterviewPlan → engine → LLM phrasing → evaluator →
+  resolveContinueState → complete → buildFinalFeedback → UI).
+- **Feedback fix (STEP 2):** the deterministic aggregation previously emitted
+  `next: []` whenever no answer scored ≤ 2, even when evaluator gaps existed.
+  Rewrote `services/feedback.ts` with an exported
+  `buildNextStepRecommendations(evaluations)`: weakest-first ordering (score,
+  then question number), `GAP_SCORE_THRESHOLD = 3`, recommendations
+  `Review <curriculumTitle> — <first evaluator gap>.` when gaps exist, fallback
+  `Practice <objective> in <curriculumTitle>.` for scores ≤ 2 with no gaps,
+  case-insensitive dedupe, `MAX_NEXT = 3`, empty when no meaningful gaps, and a
+  trailing-period fix so gap phrases that already end in "." never produce
+  "..". `buildSummary` and the `uniqueTop` dedupe/cap logic were kept.
+- **Guarantee verification (STEP 3, 232 checks):** for all 20 real candidates —
+  exactly 8 questions (numbers 1–8) with the deterministic purpose pattern, ≥ 4
+  distinct curriculum days, difficulty curves by experience (with
+  strong/struggling adjustment), one bounded follow-up that replaces Q8 (every
+  interview completes in exactly 8 answers; no loop), session isolation across
+  separate engines and interleaved sessions, and `resolveContinueState` purity.
+- **API contract audit (STEP 4, 33 checks):** start/continue/final response
+  shapes, status mapping (200/400/404/500/502/503), and no key/stack/provider-
+  text leaks. Provider failure commits nothing and the same message retries
+  once (no double-counting). Noted deviation: the supplied Technical
+  Specification's start example shows `"candidate": "CAND-001"` (string id)
+  while the implemented contract requires the full candidate object — the
+  implemented contract was kept (the frontend and service depend on it).
+- **Real-data audit (STEP 5):** curriculum (31 days) and candidates (20) load
+  only from `data/*.json`; no hard-coded copies in code.
+- **Edge cases (STEP 6, 33 checks):** malformed/JSON-non-object bodies, missing
+  or blank `sessionId`, invalid candidate shapes, duplicate `sessionId`, unknown
+  session, completed session, provider failure, LLM not configured (503), empty
+  message, and simultaneous sessions — all handled with correct statuses.
+- **390px + landing UX (STEPS 7–8):** single-column grids below `sm`, no fixed
+  widths or unbreakable text, `min-h-[44px]` touch targets, all landing CTAs →
+  `/interview`, no fake claims/testimonials/statistics.
+- **Security (STEP 9):** grep clean (only doc-comment mentions of Bearer), no
+  secrets in source or docs, `.env*` + `.env.local` ignored, and no `.env*`
+  file ever committed.
+- **Docs (STEP 10):** README updated to reflect the deterministic
+  `buildNextStepRecommendations` aggregation; this prompt appended.
+
+**Verification:**
+
+- Temporary scripts unit-tested the planner/engine/feedback guarantees
+  (`verify-m9.mts`, 232 checks) and the interview service/API contract with a
+  stubbed LLM client (`verify-m9-api.mts`, 33 checks): 0 failures; both scripts
+  removed afterwards.
+- `npm run lint`, `npx tsc --noEmit`, and `npm run build` all pass.
+- SSR smoke test of the production build: `GET /` and `GET /interview` return
+  200 with expected content.
+
+**Explicitly deferred to later prompts (do not implement early):**
+
+- Deployment, authentication, database, persistence
+- New interview features or new AI agents
+- Backend architecture changes or unnecessary refactors
+
+**Status:** Complete.

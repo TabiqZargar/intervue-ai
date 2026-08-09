@@ -53,7 +53,7 @@ and never loops or ends early.
 - Configurable runtime LLM service (`createLlmClient`, `generateInterviewQuestion`) — done (OpenAI-compatible chat completions, injectable transport, typed errors, env-var configuration)
 - Structured answer evaluation (`evaluateAnswer`) — done (schema-validated output, follow-up signal, strict-to-objective judging)
 - `POST /api/interview` API route — done (start/continue/complete, typed request validation, deterministic feedback on completion)
-- Feedback generation (`buildFinalFeedback`) — done (deterministic aggregation from stored evaluations, no extra LLM call)
+- Feedback generation (`buildFinalFeedback`, `buildNextStepRecommendations`) — done (deterministic aggregation from stored evaluations, no extra LLM call; `next` steps are grounded in evaluator gaps and curriculum objectives)
 - Interview UI at `/interview` — done (mobile-first, candidate selection, typed API client, progress, error/retry, final feedback)
 - Feedback report page — pending
 
