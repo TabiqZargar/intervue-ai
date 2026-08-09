@@ -8,6 +8,15 @@ answers through a configurable runtime LLM service, and exposes everything
 through a simple HTTP API (`POST /api/interview`). A mobile-first interview UI
 at `/interview` drives that API end to end.
 
+## Problem Statement
+
+ABTalks Hackathon Problem Statement 2 — "The Interview Agent". Candidates from
+the ABTalks AI Cohort need a realistic way to rehearse for technical interviews
+using their actual learning journey. A generic quiz cannot adapt to each
+candidate, so Intervue AI plans a personalized 8-question interview across at
+least 4 curriculum days, asks questions conversationally, probes weaker topics
+with follow-ups, and finishes with structured feedback they can act on.
+
 ## Pipeline
 
 ```text
@@ -206,3 +215,30 @@ landing page.
 - `npm run build` — create a production build
 - `npm run start` — serve the production build
 - `npm run lint` — run ESLint
+
+## Testing
+
+- `npm run lint` (ESLint) and `npx tsc --noEmit` (TypeScript) gate every
+  change; `npm run build` verifies the production bundle and route table
+  (`/` and `/interview` static, `/api/interview` dynamic/server-side).
+- Deterministic verification of the planner, engine, memory, and feedback
+  aggregation (exactly 8 questions, 4+ curriculum days, bounded follow-ups,
+  session isolation, feedback shape) runs via temporary scripts that are
+  removed after each audit; the service/API layer is exercised the same way
+  with a stubbed LLM client (all status codes, retry-safety, no-secret leaks).
+- A production SSR smoke check confirms `/` and `/interview` render with real
+  data. End-to-end API tests against the live LLM provider are optional and
+  depend on the provider accepting requests (see Deployment).
+
+## Deployment
+
+1. `npm install`, then `npm run build`.
+2. Set the server-side variables below (in `.env.local` locally, or as
+   platform secrets on the host — never `NEXT_PUBLIC_*`).
+3. Run `npm run start` (or `next start -p <port>`) on a single instance.
+4. Session state is held in process memory, so route all traffic to one
+   instance and expect sessions to reset on restart. No database is used.
+
+Sessions are isolated per `sessionId` and live only in process memory. The app
+does not deploy, push, or register the team's repository by itself — those are
+steps the team performs after submission.

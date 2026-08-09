@@ -488,3 +488,74 @@ new dependencies, no deployment, and no commits.
 - Backend architecture changes or unnecessary refactors
 
 **Status:** Complete.
+
+## Prompt 10 — Production Readiness, Deployment & Final Submission Audit
+
+**Goal:** Final production-readiness and submission audit. No redesign, no
+architecture changes, no dependency changes, no API contract changes, no data
+changes, no commits, no git-history changes, no modifications or exposure of
+`.env.local`.
+
+**What was done:**
+
+- **Repository audit:** verified `package.json` scripts, valid `tsconfig.json`,
+  and the production route table. No debug logging in source
+  (`app/components/lib/services/types`), no temporary verification scripts in
+  the repository, no build artifacts tracked, no `.env*` file ever committed.
+  Supplied data (`data/curriculum.json`, `data/candidates.json`), `README.md`,
+  and `PROMPTS.md` present. A secrets scan over all tracked files found nothing.
+- **Environment configuration:** `.env.local` defines `LLM_BASE_URL`,
+  `LLM_API_KEY`, `LLM_MODEL`, and `LLM_TIMEOUT_MS`; no `NEXT_PUBLIC_*` keys
+  exist; `process.env` is only read inside the server-side LLM service
+  (`services/llm.ts`); client components never access the key; `.env.local` is
+  untracked and git-ignored. The API key was never printed.
+- **Production build:** `npm run lint`, `npx tsc --noEmit`, and `npm run build`
+  all pass. Routes: `/` (static), `/interview` (static),
+  `/api/interview` (dynamic/server-side, as required).
+- **Production API smoke test:** started the production server and verified
+  `POST /api/interview` with a real candidate object from the supplied data.
+  The start request returns `200` with the exact welcome reply and
+  `done: false`. The provider persistently returned HTTP 429 (rate limit /
+  quota) for the LLM question-generation call, which the app correctly maps to
+  `502` with a safe, secret-free error (`"LLM provider returned HTTP 429"`).
+  After repeated retries with backoff the provider remained rate-limited, so
+  the full live interview was NOT completed and no deployment claim is made.
+  The complete lifecycle (including the final feedback shape) is covered by the
+  deterministic stub-verified checks from Prompt 9.
+- **Candidate contract:** the start request uses the full supplied candidate
+  object (verified live); it was not changed to a candidate ID string.
+- **390px UX check:** code review of `/` and `/interview` — single-column grids
+  below `sm`, no fixed widths or unbreakable text, `min-h-[44px]` touch targets
+  on every button, candidate selector and answer textarea are full-width,
+  feedback and errors are readable, loading states are present, and all landing
+  CTAs point to `/interview`. SSR re-check on the production build confirms both
+  pages render with real data.
+- **Landing-page submission check:** messaging covers Intervue AI, AI technical
+  interviewing, personalized/adaptive interviews, follow-up questions, and
+  actionable feedback; no fake statistics, testimonials, or logos.
+- **Hackathon compliance:** verified Problem Statement 2 items (conversational
+  interview, exactly 8 questions, ≥4 curriculum days, personalization, bounded
+  follow-ups, context maintained, structured final feedback, required HTTP
+  endpoint, supplied candidate/curriculum data used). Stage 1: repository is on
+  GitHub (`TabiqZargar/intervue-ai`); deployment and team registration are
+  human steps. Stage 2: `PROMPTS.md` reflects the actual process, history is
+  milestone-based and unmodified, and no unrelated codebase was imported.
+- **README:** added the genuinely missing required sections — a short
+  Problem Statement, a Testing section, and a Deployment section (single
+  in-memory instance note, server-side env config). No unnecessary rewrites.
+- Appended this truthful Prompt 10 entry.
+
+**Verification:**
+
+- `npm run lint`, `npx tsc --noEmit`, and `npm run build` all pass.
+- Production SSR smoke: `/` and `/interview` return 200 with expected content.
+- Live API start/error-mapping verified; full live interview blocked by the
+  provider's persistent HTTP 429 (external quota), reported truthfully — not
+  fabricated as a pass.
+
+**Explicitly deferred to later prompts (do not implement early):**
+
+- Actual deployment, git push, and team registration (human steps)
+- Authentication, database/persistence, new features
+
+**Status:** Complete.
