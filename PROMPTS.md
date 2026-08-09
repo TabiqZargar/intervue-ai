@@ -761,3 +761,49 @@ Network and timeout errors log nothing.
 - Prompt 11 suite (98 mocked checks) and Prompt 12 repro (11 checks) still pass.
 
 **Status:** Complete.
+
+## Prompt 14 — Final UI/UX Polish
+
+**Goal:** Polish the existing Intervue AI interface for the final hackathon
+submission without changing backend behavior, interview logic, API contracts,
+data, or dependencies.
+
+**What was done:**
+
+- Improved `ProgressIndicator` with a clearer "Question X of 8" presentation,
+  a percentage indicator, and a stronger progress track/fill.
+- Improved `MessageList` with clearer interviewer/candidate visual
+  distinction, interviewer labels, accent treatment, and a pending evaluation
+  state.
+- Improved `AnswerComposer` with stronger focus states, clearer
+  loading/disabled states, improved button touch targets, and contextual
+  helper text.
+- Improved `ErrorBanner` with clearer hierarchy, a prominent retry action, and
+  messaging confirming that an active session can be retried without losing
+  progress.
+- Improved `FeedbackPanel` with a stronger heading hierarchy, a highlighted
+  summary area, numbered markers, and clearer visual separation between
+  strengths, gaps, and next steps.
+- Improved `CandidateSelector` and `InterviewHeader` with stronger typography,
+  spacing, and subtle visual hierarchy.
+- Polished the landing page components (`Hero`, `HowItWorks`, `WhatYouGet`,
+  `Comparison`, `FinalCta`, `LandingHeader`, `Footer`) for consistent
+  typography, badges, hover states, spacing, and overall product identity.
+- Maintained the existing responsive/mobile-first behavior and
+  accessibility-oriented touch targets.
+
+**Scope:** UI/UX only. No changes to `services/`, `lib/`, `types/`, `data/`,
+API routes, interview engine, LLM integration, Redis/session storage, or
+environment configuration. No new dependencies. Existing API contracts and
+interview behavior remain unchanged.
+
+**Verification:**
+
+- `npm run lint`, `npx tsc --noEmit`, and `npm run build` all pass.
+- `/` and `/interview` remain static; `/api/interview` remains
+  dynamic/server-rendered.
+- Existing interview functionality and backend behavior remain unchanged.
+
+**Commit:** `396c924 feat: polish interview and landing page UI`
+
+**Status:** Complete.
