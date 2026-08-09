@@ -5,6 +5,7 @@ import type {
   LlmChatMessage,
   LlmConfig,
   LlmConfigResult,
+  LlmOperation,
   LlmServiceErrorCode,
 } from "@/types/llm";
 import type { QuestionPurpose } from "@/types/planner";
@@ -92,7 +93,7 @@ export interface LlmClient {
   config: LlmConfig | null;
   chat(
     messages: LlmChatMessage[],
-    options?: { temperature?: number },
+    options?: { temperature?: number; operation?: LlmOperation },
   ): Promise<LlmCallResult<string>>;
 }
 
@@ -129,7 +130,11 @@ export function createLlmClient(
         const response = await transport(request, configResult.config);
         return parseChatContent(response);
       } catch (err) {
-        return mapTransportError(err, configResult.config.timeoutMs);
+        return mapTransportError(
+          err,
+          configResult.config.timeoutMs,
+          chatOptions?.operation,
+        );
       }
     },
   };
@@ -186,6 +191,7 @@ export async function generateInterviewQuestion(
 ): Promise<LlmCallResult<GeneratedQuestion>> {
   const result = await client.chat(buildInterviewerMessages(input), {
     temperature: 0.7,
+    operation: "question_generation",
   });
   if (!result.ok) {
     return result;
@@ -344,8 +350,14 @@ function parseChatContent(response: unknown): LlmCallResult<string> {
 function mapTransportError(
   err: unknown,
   timeoutMs: number,
+  operation?: LlmOperation,
 ): LlmCallResult<string> {
   if (err instanceof ProviderHttpError) {
+    // Safe diagnostic: provider HTTP status + operation only. Never logs the
+    // API key, headers, prompts, or the provider's response body.
+    console.error(
+      `[llm] provider_http_error status=${err.status} operation=${operation ?? "unknown"}`,
+    );
     return {
       ok: false,
       error: {

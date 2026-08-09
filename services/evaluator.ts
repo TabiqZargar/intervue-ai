@@ -43,6 +43,7 @@ export async function evaluateAnswer(
 ): Promise<LlmCallResult<AnswerEvaluation>> {
   const result = await client.chat(buildEvaluatorMessages(input), {
     temperature: 0.2,
+    operation: "evaluation",
   });
   if (!result.ok) {
     return result;

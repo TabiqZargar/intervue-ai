@@ -46,6 +46,9 @@ export type LlmCallResult<T> =
   | { ok: true; value: T }
   | { ok: false; error: LlmServiceError };
 
+/** Which interview step an LLM call serves; used for safe diagnostic logging. */
+export type LlmOperation = "question_generation" | "evaluation";
+
 /** Natural-language question produced by the interviewer LLM. */
 export interface GeneratedQuestion {
   questionNumber: number;

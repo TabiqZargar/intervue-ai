@@ -706,3 +706,58 @@ client behavior.
 push, Vercel/Upstash env configuration, live end-to-end confirmation.
 
 **Status:** Complete.
+
+## Prompt 13 — Safe Provider-Error Diagnostic (Gemini HTTP Status)
+
+**Goal:** Diagnostic-only. Identify exactly which HTTP status the Gemini
+compatible provider is returning when `POST /api/interview` produces a 502, by
+adding minimal server-side logging at the provider HTTP failure boundary. No
+architecture, API contract, retry, engine, planner, evaluator schema,
+persistence, or frontend changes. Stop after the report — no commit/push/deploy.
+
+**Existing provider error path (traced, unchanged):**
+
+1. `fetchTransport` (`services/llm.ts`) POSTs `{baseUrl}/chat/completions`; on a
+   non-2xx response it throws `ProviderHttpError(response.status)`.
+2. `createLlmClient.chat()` catches and maps it via `mapTransportError` to a
+   typed `LlmServiceError { code: "http", message: "LLM provider returned HTTP
+   <status>" }`.
+3. `generateInterviewQuestion` (`services/llm.ts`) or `evaluateAnswer`
+   (`services/evaluator.ts`) returns the failing `LlmCallResult`.
+4. `interview-service.ts` `llmErrorToHttp` maps `code: "http"` to `502` with the
+   safe message; the route returns it to the browser.
+
+**Status availability:** the HTTP status was already available internally — as
+`ProviderHttpError.status` (and embedded in the safe message) — but it was
+**never logged**. The browser already receives only the safe 502 body; this
+change adds server-side visibility only.
+
+**What was done (diagnostic logging only):**
+
+- `types/llm.ts`: added `LlmOperation = "question_generation" | "evaluation"`.
+- `services/llm.ts`: `LlmClient.chat` options gained an optional `operation`;
+  `generateInterviewQuestion` passes `operation: "question_generation"`;
+  `mapTransportError` now logs exactly one line for `ProviderHttpError`:
+  `[llm] provider_http_error status=<status> operation=<operation|unknown>`.
+- `services/evaluator.ts`: `evaluateAnswer` passes `operation: "evaluation"`.
+
+**Guaranteed safe:** the log contains only the numeric HTTP status and the
+operation label. It never logs the API key, authorization headers, Upstash
+credentials, request headers, prompts, candidate data, answers, provider
+response bodies, stack traces, session contents, or personal information.
+Network and timeout errors log nothing.
+
+**Verification:**
+
+- `npm run lint`, `npx tsc --noEmit`, `npm run build` all pass; `/api/interview`
+  remains dynamic/server-side.
+- Temporary mock-transport test (outside the repo, no real Gemini call, no live
+  database): 11 checks, 0 failures — a mocked 429 logs exactly
+  `[llm] provider_http_error status=429 operation=question_generation`, a mocked
+  400 logs exactly `status=400 operation=evaluation`, the typed error behavior
+  is unchanged (`code: "http"`, same safe message → same 502 mapping), network
+  and timeout errors log nothing, and no API key / prompt / answer / response
+  body / candidate name / authorization header appears in any captured log.
+- Prompt 11 suite (98 mocked checks) and Prompt 12 repro (11 checks) still pass.
+
+**Status:** Complete.
