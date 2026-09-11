@@ -134,7 +134,7 @@ function isInterviewApiResponse(value: unknown): value is InterviewApiResponse {
   if (record.done !== true) {
     return false;
   }
-  return isFinalFeedback(record.feedback);
+  return isFinalFeedback(record.feedback) && isDetailedStatistics(record.statistics);
 }
 
 function isFinalFeedback(value: unknown): boolean {
@@ -150,8 +150,47 @@ function isFinalFeedback(value: unknown): boolean {
   );
 }
 
+function isDetailedStatistics(value: unknown): boolean {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  const subScores = record.averageSubScores;
+  const byDifficulty = record.byDifficulty;
+  return (
+    typeof record.totalQuestions === "number" &&
+    typeof record.answeredQuestions === "number" &&
+    typeof record.overallScore === "number" &&
+    typeof record.percentage === "number" &&
+    typeof record.overall === "string" &&
+    isNumberArray(record.scoreProgression) &&
+    isObject(subScores) &&
+    isNumber(subScores.correctness) &&
+    isNumber(subScores.depth) &&
+    isNumber(subScores.reasoning) &&
+    isNumber(subScores.communication) &&
+    Array.isArray(record.byTopic) &&
+    isObject(byDifficulty) &&
+    isNumber(record.totalTimeSeconds) &&
+    typeof record.totalTimeLabel === "string" &&
+    isNumber(record.averageTimePerQuestionSeconds)
+  );
+}
+
 function isStringArray(value: unknown): boolean {
   return (
     Array.isArray(value) && value.every((item) => typeof item === "string")
   );
+}
+
+function isNumberArray(value: unknown): boolean {
+  return Array.isArray(value) && value.every((item) => typeof item === "number");
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
 }

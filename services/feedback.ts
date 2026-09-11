@@ -1,8 +1,12 @@
-import type { AnswerEvaluation } from "@/types/llm";
+import type { AnswerEvaluation, AnswerLevel } from "@/types/llm";
+import type { QuestionDifficulty } from "@/types/planner";
 import type {
   ConversationTurn,
+  DetailedStatistics,
+  DifficultyPerformance,
   FinalFeedback,
   InterviewSession,
+  TopicPerformance,
 } from "@/types/interview";
 
 /**
@@ -52,6 +56,166 @@ export function buildFinalFeedback(session: InterviewSession): FinalFeedback {
     ),
     next: buildNextStepRecommendations(evaluations),
   };
+}
+
+const DIFFICULTIES: readonly QuestionDifficulty[] = ["easy", "medium", "hard"];
+
+/**
+ * Rich, deterministic statistics derived entirely from the stored per-answer
+ * evaluations and session timestamps. No extra LLM call. The strongest and
+ * weakest topics come from the same per-topic averages shown in `byTopic`.
+ */
+export function buildDetailedStatistics(
+  session: InterviewSession,
+): DetailedStatistics {
+  const evaluations = evaluatedTurns(session);
+  const answered = evaluations.length;
+  const totalTimeSeconds = sessionDurationSeconds(session);
+
+  if (answered === 0) {
+    return {
+      totalQuestions: session.plan.totalQuestions,
+      answeredQuestions: 0,
+      overallScore: 0,
+      percentage: 0,
+      overall: "weak",
+      scoreProgression: [],
+      averageSubScores: {
+        correctness: 0,
+        depth: 0,
+        reasoning: 0,
+        communication: 0,
+      },
+      byTopic: [],
+      byDifficulty: buildDifficultyPerformance(evaluations),
+      strongestTopic: null,
+      weakestTopic: null,
+      totalTimeSeconds,
+      totalTimeLabel: formatDuration(totalTimeSeconds),
+      averageTimePerQuestionSeconds: 0,
+    };
+  }
+
+  const overallScore = roundOne(
+    mean(evaluations.map((entry) => entry.evaluation.score)),
+  );
+  const byTopic = buildTopicPerformance(evaluations);
+
+  return {
+    totalQuestions: session.plan.totalQuestions,
+    answeredQuestions: answered,
+    overallScore,
+    percentage: Math.round((overallScore / 5) * 100),
+    overall: levelForScore(overallScore),
+    scoreProgression: evaluations.map((entry) => entry.evaluation.score),
+    averageSubScores: {
+      correctness: roundOne(
+        mean(evaluations.map((entry) => entry.evaluation.correctness)),
+      ),
+      depth: roundOne(mean(evaluations.map((entry) => entry.evaluation.depth))),
+      reasoning: roundOne(
+        mean(evaluations.map((entry) => entry.evaluation.reasoning)),
+      ),
+      communication: roundOne(
+        mean(evaluations.map((entry) => entry.evaluation.communication)),
+      ),
+    },
+    byTopic,
+    byDifficulty: buildDifficultyPerformance(evaluations),
+    strongestTopic: byTopic[0] ?? null,
+    weakestTopic:
+      byTopic.length > 0 ? byTopic[byTopic.length - 1] ?? null : null,
+    totalTimeSeconds,
+    totalTimeLabel: formatDuration(totalTimeSeconds),
+    averageTimePerQuestionSeconds:
+      answered > 0 ? Math.round(totalTimeSeconds / answered) : 0,
+  };
+}
+
+function buildTopicPerformance(
+  evaluations: readonly EvaluatedTurn[],
+): TopicPerformance[] {
+  const buckets = new Map<number, { title: string; scores: number[] }>();
+  for (const entry of evaluations) {
+    const bucket = buckets.get(entry.turn.curriculumDay) ?? {
+      title: entry.turn.curriculumTitle,
+      scores: [],
+    };
+    bucket.scores.push(entry.evaluation.score);
+    buckets.set(entry.turn.curriculumDay, bucket);
+  }
+
+  return [...buckets.entries()]
+    .map(([day, bucket]) => ({
+      day,
+      title: bucket.title,
+      averageScore: roundOne(mean(bucket.scores)),
+      questionCount: bucket.scores.length,
+    }))
+    .sort((a, b) => b.averageScore - a.averageScore || a.day - b.day);
+}
+
+function buildDifficultyPerformance(
+  evaluations: readonly EvaluatedTurn[],
+): Record<QuestionDifficulty, DifficultyPerformance> {
+  const buckets: Record<QuestionDifficulty, number[]> = {
+    easy: [],
+    medium: [],
+    hard: [],
+  };
+  for (const entry of evaluations) {
+    const bucket = buckets[entry.turn.difficulty];
+    if (bucket) {
+      bucket.push(entry.evaluation.score);
+    }
+  }
+  return DIFFICULTIES.reduce(
+    (result, difficulty) => {
+      result[difficulty] = {
+        averageScore: roundOne(mean(buckets[difficulty])),
+        questionCount: buckets[difficulty].length,
+      };
+      return result;
+    },
+    {} as Record<QuestionDifficulty, DifficultyPerformance>,
+  );
+}
+
+function levelForScore(score: number): AnswerLevel {
+  const rounded = roundOne(score);
+  return rounded >= 4 ? "strong" : rounded >= 3 ? "adequate" : "weak";
+}
+
+function mean(values: readonly number[]): number {
+  if (values.length === 0) {
+    return 0;
+  }
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function roundOne(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+function sessionDurationSeconds(session: InterviewSession): number {
+  if (!session.completedAt) {
+    return 0;
+  }
+  const started = Date.parse(session.startedAt);
+  const completed = Date.parse(session.completedAt);
+  if (Number.isNaN(started) || Number.isNaN(completed)) {
+    return 0;
+  }
+  return Math.max(0, Math.round((completed - started) / 1000));
+}
+
+function formatDuration(totalSeconds: number): string {
+  if (totalSeconds <= 0) {
+    return "0s";
+  }
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
 }
 
 /**

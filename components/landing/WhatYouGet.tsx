@@ -2,7 +2,7 @@ const items = [
   {
     number: "01",
     title: "Personalized Interview",
-    description: "Questions based on the candidate's journey.",
+    description: "Questions based on the candidate's learning journey.",
   },
   {
     number: "02",
@@ -12,14 +12,15 @@ const items = [
   },
   {
     number: "03",
-    title: "Strengths & Gaps",
-    description: "Understand what you know and where you need more depth.",
+    title: "Score Statistics",
+    description:
+      "Overall score, sub-scores, and topic and difficulty breakdowns.",
   },
   {
     number: "04",
-    title: "Next Steps",
+    title: "Strengths, Gaps & Next Steps",
     description:
-      "Turn interview weaknesses into concrete areas to study.",
+      "See what you know, where you need more depth, and what to study next.",
   },
 ];
 

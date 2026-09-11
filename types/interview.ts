@@ -12,7 +12,7 @@ import type {
   QuestionDifficulty,
   QuestionPurpose,
 } from "@/types/planner";
-import type { AnswerEvaluation } from "@/types/llm";
+import type { AnswerEvaluation, AnswerLevel } from "@/types/llm";
 
 export type MessageRole = "assistant" | "user";
 
@@ -111,6 +111,63 @@ export interface FinalFeedback {
   strengths: string[];
   gaps: string[];
   next: string[];
+}
+
+/** Average performance on a single curriculum topic (day). */
+export interface TopicPerformance {
+  day: number;
+  title: string;
+  /** Average score out of 5 (one decimal). */
+  averageScore: number;
+  /** Number of questions on this topic. */
+  questionCount: number;
+}
+
+/** Average performance at a difficulty level. */
+export interface DifficultyPerformance {
+  /** Average score out of 5 (one decimal). */
+  averageScore: number;
+  questionCount: number;
+}
+
+/**
+ * Rich, deterministic statistics derived entirely from the stored per-turn
+ * `AnswerEvaluation` data. Computed at completion; never fabricated.
+ */
+export interface DetailedStatistics {
+  /** Total planned questions in the interview. */
+  totalQuestions: number;
+  /** Number of answers that were evaluated. */
+  answeredQuestions: number;
+  /** Overall average score out of 5 (one decimal). */
+  overallScore: number;
+  /** Overall score as a percentage, 0–100 (rounded to a whole number). */
+  percentage: number;
+  /** Overall level derived from the average score. */
+  overall: AnswerLevel;
+  /** Per-question scores in chronological order (each out of 5). */
+  scoreProgression: number[];
+  /** Average sub-scores across all answers (each out of 5). */
+  averageSubScores: {
+    correctness: number;
+    depth: number;
+    reasoning: number;
+    communication: number;
+  };
+  /** Performance grouped by curriculum topic, sorted by average descending. */
+  byTopic: TopicPerformance[];
+  /** Performance grouped by question difficulty. */
+  byDifficulty: Record<QuestionDifficulty, DifficultyPerformance>;
+  /** Topic with the highest average score; null when no topics were evaluated. */
+  strongestTopic: TopicPerformance | null;
+  /** Topic with the lowest average score; null when no topics were evaluated. */
+  weakestTopic: TopicPerformance | null;
+  /** Total interview duration in seconds (largest denominator present). */
+  totalTimeSeconds: number;
+  /** Total interview duration as a short human string, e.g. "4m 12s". */
+  totalTimeLabel: string;
+  /** Average time per answered question in seconds. */
+  averageTimePerQuestionSeconds: number;
 }
 
 /** Future evaluator output; implemented in a later milestone. */

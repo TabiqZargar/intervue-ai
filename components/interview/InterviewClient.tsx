@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import type { Candidate } from "@/types/candidate";
-import type { FinalFeedback } from "@/types/interview";
+import type { DetailedStatistics, FinalFeedback } from "@/types/interview";
 import {
   continueInterview,
   createSessionId,
@@ -37,6 +37,7 @@ export function InterviewClient({ candidates }: InterviewClientProps) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [feedback, setFeedback] = useState<FinalFeedback | null>(null);
+  const [statistics, setStatistics] = useState<DetailedStatistics | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
 
@@ -76,6 +77,7 @@ export function InterviewClient({ candidates }: InterviewClientProps) {
       ]);
       if (result.response.done) {
         setFeedback(result.response.feedback);
+        setStatistics(result.response.statistics);
         setPhase("completed");
       } else {
         setPhase("active");
@@ -110,6 +112,7 @@ export function InterviewClient({ candidates }: InterviewClientProps) {
       setDraft("");
       if (response.done) {
         setFeedback(response.feedback);
+        setStatistics(response.statistics);
         setPhase("completed");
       } else {
         setPhase("active");
@@ -125,6 +128,7 @@ export function InterviewClient({ candidates }: InterviewClientProps) {
     setSelected(null);
     setMessages([]);
     setFeedback(null);
+    setStatistics(null);
     setError(null);
     setDraft("");
     setPhase("selecting");
@@ -184,7 +188,7 @@ export function InterviewClient({ candidates }: InterviewClientProps) {
           </>
         )}
 
-        {phase === "completed" && feedback && selected && (
+        {phase === "completed" && feedback && statistics && selected && (
           <>
             <ProgressIndicator
               messages={messages}
@@ -192,7 +196,11 @@ export function InterviewClient({ candidates }: InterviewClientProps) {
               completed
             />
             <MessageList messages={messages} />
-            <FeedbackPanel feedback={feedback} onRestart={resetInterview} />
+            <FeedbackPanel
+              feedback={feedback}
+              statistics={statistics}
+              onRestart={resetInterview}
+            />
           </>
         )}
       </main>

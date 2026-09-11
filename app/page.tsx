@@ -4,6 +4,7 @@ import { Hero } from "@/components/landing/Hero";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { Comparison } from "@/components/landing/Comparison";
 import { WhatYouGet } from "@/components/landing/WhatYouGet";
+import { ResultsPreview } from "@/components/landing/ResultsPreview";
 import { FinalCta } from "@/components/landing/FinalCta";
 import { Footer } from "@/components/landing/Footer";
 
@@ -20,8 +21,9 @@ export default function Home() {
       <main className="flex flex-1 flex-col">
         <Hero />
         <HowItWorks />
-        <Comparison />
+        <ResultsPreview />
         <WhatYouGet />
+        <Comparison />
         <FinalCta />
       </main>
       <Footer />

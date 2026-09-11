@@ -47,7 +47,10 @@ export type LlmCallResult<T> =
   | { ok: false; error: LlmServiceError };
 
 /** Which interview step an LLM call serves; used for safe diagnostic logging. */
-export type LlmOperation = "question_generation" | "evaluation";
+export type LlmOperation =
+  | "question_generation"
+  | "evaluation"
+  | "evaluate_and_generate";
 
 /** Natural-language question produced by the interviewer LLM. */
 export interface GeneratedQuestion {
@@ -101,6 +104,51 @@ export interface EvaluatorPromptInput {
   candidateAnswer: string;
   /** Single-day curriculum context (tools) — never the whole curriculum. */
   curriculumDay: Pick<CurriculumDay, "title" | "tools">;
+  /** Bounded recent conversation window; the caller limits the size. */
+  conversation: ConversationTurn[];
+}
+
+/**
+ * Output of a single combined LLM call that evaluates the candidate's answer
+ * AND phrases the next question. This halves the number of provider
+ * round-trips per answer (one call instead of two), reducing the perceived
+ * evaluation latency without changing the API contract.
+ */
+export interface CombinedEvaluationResult {
+  evaluation: AnswerEvaluation;
+  /**
+   * Natural-language text of the follow-up question when the evaluator
+   * recommends one; null otherwise. The deterministic engine decides which
+   * text to use based on the evaluation and session state.
+   */
+  followUpQuestionText: string | null;
+  /** Natural-language text of the next planned question. */
+  nextQuestionText: string;
+}
+
+/**
+ * Input for the combined evaluate-and-generate call: everything the evaluator
+ * needs (the question just asked, the answer, the judged objective) and
+ * everything the interviewer needs to phrase the next planned question.
+ */
+export interface CombinedPromptInput {
+  candidateProfile: Member;
+  experienceLevel: ExperienceLevel;
+  /** The question the candidate just answered (its text). */
+  generatedQuestion: GeneratedQuestion;
+  /**
+   * The planned spec of the question just answered. Its curriculum objective
+   * is what the evaluator judges the answer against.
+   */
+  evalPlannedQuestion: PlannedQuestion;
+  /** The candidate's answer text. */
+  candidateAnswer: string;
+  /** Single-day curriculum context for the objective being judged. */
+  evalCurriculumDay: Pick<CurriculumDay, "title" | "tools">;
+  /** The next planned question specification to phrase. */
+  plannedQuestion: PlannedQuestion;
+  /** Single-day curriculum context for the next planned question. */
+  nextCurriculumDay: Pick<CurriculumDay, "title" | "type" | "tools">;
   /** Bounded recent conversation window; the caller limits the size. */
   conversation: ConversationTurn[];
 }

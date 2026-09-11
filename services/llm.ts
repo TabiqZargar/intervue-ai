@@ -299,7 +299,7 @@ export function buildInterviewerMessages(
   ];
 }
 
-function purposeFocus(purpose: QuestionPurpose): string {
+export function purposeFocus(purpose: QuestionPurpose): string {
   switch (purpose) {
     case "probe":
       return "dig deeper into a topic the candidate may be shaky on";

@@ -17,7 +17,7 @@
  *     } }
  */
 import type { Candidate } from "@/types/candidate";
-import type { FinalFeedback } from "@/types/interview";
+import type { DetailedStatistics, FinalFeedback } from "@/types/interview";
 
 export interface InterviewStartRequest {
   sessionId: string;
@@ -42,6 +42,8 @@ export interface InterviewFinalResponse {
   reply: string;
   done: true;
   feedback: FinalFeedback;
+  /** Rich statistics derived from the stored per-answer evaluations. */
+  statistics: DetailedStatistics;
 }
 
 export type InterviewApiResponse =

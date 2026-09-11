@@ -3,8 +3,11 @@ import {
   parseInterviewRequest,
   type ParsedInterviewRequest,
 } from "@/lib/validators";
-import { evaluateAnswer } from "@/services/evaluator";
-import { buildFinalFeedback } from "@/services/feedback";
+import {
+  evaluateAndGenerateNext,
+  evaluateAnswer,
+} from "@/services/evaluator";
+import { buildDetailedStatistics, buildFinalFeedback } from "@/services/feedback";
 import {
   resolveContinueState,
   type InterviewEngine,
@@ -17,6 +20,8 @@ import {
 import type { EngineError } from "@/types/interview";
 import type {
   AnswerEvaluation,
+  CombinedEvaluationResult,
+  CombinedPromptInput,
   EvaluatorPromptInput,
   InterviewerPromptInput,
   LlmServiceError,
@@ -35,10 +40,11 @@ import type {
  * Turn semantics:
  * - Start (candidate provided): welcome reply, no LLM call, no question asked.
  * - First message (no question phrased yet): phrase Q1 and reply with it.
- * - Later messages: evaluate the answer, then either phrase a follow-up (when
- *   the evaluator recommends one and the follow-up slot is unused) or the next
- *   planned question; the final answer completes the interview with aggregate
- *   feedback.
+ * - Later messages: a single combined LLM call evaluates the answer AND phrases
+ *   the next question (halving provider round-trips). The deterministic engine
+ *   then decides whether the follow-up text or the next planned question text
+ *   becomes the next message; the final answer completes the interview with
+ *   aggregate feedback and derived statistics.
  *
  * The engine commits state only after evaluation and phrasing succeed, so a
  * provider failure can be retried with the same message without double-counting.
@@ -141,26 +147,20 @@ export function createInterviewService(
       return internalError("session has no active question to answer");
     }
 
-    const evaluation = await evaluateAnswerFor(options.client, session, spec, message);
-    if (!evaluation.ok) {
-      return evaluation.error;
-    }
-
-    const state = resolveContinueState(session, evaluation.value);
-
-    if (state.next) {
-      const priorEvaluation =
-        state.sessionChanges.followUpActive ? evaluation.value : undefined;
-      const generated = await generateQuestion(
+    // The interview is guaranteed to complete when there is no further planned
+    // question, so the last answer only needs a pure evaluation (a single LLM
+    // call) and no question phrasing.
+    const nextSpec = nextPlannedQuestion(session);
+    if (!nextSpec) {
+      const evaluation = await evaluateAnswerFor(
         options.client,
         session,
-        state.next,
-        priorEvaluation,
+        spec,
+        message,
       );
-      if (!generated.ok) {
-        return generated.error;
+      if (!evaluation.ok) {
+        return evaluation.error;
       }
-
       const commit = await options.engine.continueInterview(
         session.sessionId,
         message,
@@ -169,30 +169,68 @@ export function createInterviewService(
       if (!commit.ok) {
         return engineErrorToHttp(commit.error);
       }
-      if (commit.done) {
-        return finalResponse(commit.session);
+      if (!commit.done) {
+        return internalError("engine did not complete the finished interview");
       }
-      if (!matchesSpec(commit.question, state.next)) {
-        return internalError("question resolution diverged from the engine");
-      }
-
-      await options.engine.setCurrentQuestionText(session.sessionId, generated.text);
-      return { status: 200, body: { reply: generated.text, done: false } };
+      return finalResponse(commit.session);
     }
 
-    // No further questions: this answer completes the interview.
+    // One combined LLM call: evaluate the answer and phrase the next question.
+    // The engine later decides whether the follow-up text or the next planned
+    // question text becomes the next message.
+    const combined = await evaluateAndGenerateNextFor(
+      options.client,
+      session,
+      spec,
+      nextSpec,
+      message,
+    );
+    if (!combined.ok) {
+      return combined.error;
+    }
+    const { evaluation, followUpQuestionText, nextQuestionText } =
+      combined.value;
+
+    const state = resolveContinueState(session, evaluation);
+    if (state.completed || !state.next) {
+      // The answer completes the interview; the combined question text is unused.
+      const commit = await options.engine.continueInterview(
+        session.sessionId,
+        message,
+        { evaluation },
+      );
+      if (!commit.ok) {
+        return engineErrorToHttp(commit.error);
+      }
+      if (!commit.done) {
+        return internalError("engine did not complete the finished interview");
+      }
+      return finalResponse(commit.session);
+    }
+
+    // Choose the message text before committing so a failure here never leaves
+    // a stored turn without a shown question.
+    const text = state.sessionChanges.followUpActive
+      ? followUpQuestionText ?? nextQuestionText
+      : nextQuestionText;
+
     const commit = await options.engine.continueInterview(
       session.sessionId,
       message,
-      { evaluation: evaluation.value },
+      { evaluation },
     );
     if (!commit.ok) {
       return engineErrorToHttp(commit.error);
     }
-    if (!commit.done) {
-      return internalError("engine did not complete the finished interview");
+    if (commit.done) {
+      return internalError("unexpected completion after resolving a next question");
     }
-    return finalResponse(commit.session);
+    if (!matchesSpec(commit.question, state.next)) {
+      return internalError("question resolution diverged from the engine");
+    }
+
+    await options.engine.setCurrentQuestionText(session.sessionId, text);
+    return { status: 200, body: { reply: text, done: false } };
   }
 
   function finalResponse(session: InterviewSession): InterviewServiceResult {
@@ -202,9 +240,24 @@ export function createInterviewService(
         reply: COMPLETED_REPLY,
         done: true,
         feedback: buildFinalFeedback(session),
+        statistics: buildDetailedStatistics(session),
       },
     };
   }
+}
+
+/**
+ * The planned question AFTER the currently active one, accounting for an
+ * in-flight follow-up. When this returns undefined the interview is guaranteed
+ * to complete after the current answer is stored.
+ */
+function nextPlannedQuestion(
+  session: InterviewSession,
+): PlannedQuestion | undefined {
+  if (session.followUpActive) {
+    return session.plan.questions[session.currentQuestionIndex];
+  }
+  return session.plan.questions[session.currentQuestionIndex + 1];
 }
 
 async function evaluateAnswerFor(
@@ -224,6 +277,37 @@ async function evaluateAnswerFor(
     conversation: session.turns,
   };
   const result = await evaluateAnswer(input, client);
+  if (!result.ok) {
+    return { ok: false, error: llmErrorToHttp(result.error) };
+  }
+  return { ok: true, value: result.value };
+}
+
+async function evaluateAndGenerateNextFor(
+  client: LlmClient,
+  session: InterviewSession,
+  spec: PlannedQuestion,
+  nextSpec: PlannedQuestion,
+  message: string,
+): Promise<
+  | { ok: true; value: CombinedEvaluationResult }
+  | { ok: false; error: InterviewServiceResult }
+> {
+  const input: CombinedPromptInput = {
+    candidateProfile: session.candidate.member,
+    experienceLevel: session.analysis.experienceLevel,
+    generatedQuestion: {
+      questionNumber: spec.questionNumber,
+      text: session.currentQuestionText,
+    },
+    evalPlannedQuestion: spec,
+    candidateAnswer: message,
+    evalCurriculumDay: dayTools(spec),
+    plannedQuestion: nextSpec,
+    nextCurriculumDay: dayTools(nextSpec),
+    conversation: session.turns,
+  };
+  const result = await evaluateAndGenerateNext(input, client);
   if (!result.ok) {
     return { ok: false, error: llmErrorToHttp(result.error) };
   }
