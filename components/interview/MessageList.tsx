@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { BrandMark } from "@/components/ui/brand";
 import { Spinner } from "./Spinner";
 import type { ChatMessage } from "./types";
 
@@ -27,7 +28,7 @@ export function MessageList({ messages, pending }: MessageListProps) {
     <div
       aria-live="polite"
       aria-atomic="false"
-      className="flex flex-col gap-4"
+      className="flex flex-col gap-6"
     >
       {messages.map((message) => (
         <Message key={message.id} message={message} />
@@ -56,9 +57,14 @@ function PendingStatus() {
   const label = PENDING_STEPS[step] ?? PENDING_STEPS[0];
 
   return (
-    <div className="inline-flex max-w-full items-center gap-2.5 self-start rounded-xl border border-dashed border-zinc-300 bg-white pl-4 pr-5 py-3 text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
-      <Spinner className="h-4 w-4 shrink-0" />
-      <span className="min-w-0">{label}…</span>
+    <div className="flex max-w-full animate-fade-in items-start gap-3 self-start">
+      <span className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-ink-3/10 text-ink-2">
+        <Spinner className="h-4 w-4" />
+      </span>
+      <span className="min-w-0">
+        <span className="kicker mb-1.5 block text-ink-3">Assessing</span>
+        <span className="text-sm text-ink-2">{label}…</span>
+      </span>
     </div>
   );
 }
@@ -66,30 +72,27 @@ function PendingStatus() {
 function Message({ message }: { message: ChatMessage }) {
   if (message.role === "interviewer") {
     return (
-      <div className="rounded-xl border border-zinc-200 bg-white px-4 py-4 dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="mb-2 flex items-center gap-2">
-          <span
-            aria-hidden="true"
-            className="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-500"
-          />
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+      <div className="flex max-w-full animate-message-in items-start gap-3">
+        <BrandMark className="mt-0.5" />
+        <div className="min-w-0 flex-1">
+          <p className="kicker mb-1.5 text-indigo-600 dark:text-indigo-300">
             Interviewer
           </p>
+          <p className="whitespace-pre-wrap break-words text-[15px] leading-7 text-ink">
+            {message.content}
+          </p>
         </div>
-        <p className="whitespace-pre-wrap break-words text-[15px] leading-7 text-zinc-900 dark:text-zinc-100">
-          {message.content}
-        </p>
       </div>
     );
   }
 
   return (
-    <div className="flex justify-end">
-      <div className="max-w-[88%] rounded-2xl rounded-br-md border border-indigo-200 bg-indigo-50 px-4 py-3 dark:border-indigo-900/70 dark:bg-indigo-950/50">
-        <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+    <div className="flex animate-message-in justify-end">
+      <div className="max-w-[88%] rounded-2xl rounded-br-md bg-indigo-500/[0.07] px-4 py-3 ring-1 ring-inset ring-indigo-500/15 sm:max-w-[80%]">
+        <p className="kicker mb-1 text-indigo-600 dark:text-indigo-300">
           Your answer
         </p>
-        <p className="whitespace-pre-wrap break-words text-[15px] leading-6 text-zinc-900 dark:text-zinc-100">
+        <p className="whitespace-pre-wrap break-words text-[15px] leading-6 text-ink">
           {message.content}
         </p>
       </div>

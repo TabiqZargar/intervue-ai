@@ -12,12 +12,14 @@ export function Spinner({ className = "h-4 w-4" }: { className?: string }) {
         cy="12"
         r="10"
         stroke="currentColor"
-        strokeWidth="4"
+        strokeWidth="3.5"
       />
       <path
-        className="opacity-75"
-        fill="currentColor"
-        d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z"
+        className="opacity-90"
+        d="M12 2a10 10 0 0 1 10 10"
+        stroke="currentColor"
+        strokeWidth="3.5"
+        strokeLinecap="round"
       />
     </svg>
   );

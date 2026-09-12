@@ -1,4 +1,5 @@
-import { experienceLabel } from "./types";
+import { Brand } from "@/components/ui/brand";
+import { experienceLabel, initials } from "./types";
 import type { CandidateOption } from "./types";
 
 interface InterviewHeaderProps {
@@ -7,24 +8,23 @@ interface InterviewHeaderProps {
 
 export function InterviewHeader({ candidate }: InterviewHeaderProps) {
   return (
-    <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/90 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90">
-      <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3 px-4 py-3.5">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Intervue AI
-          </p>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            Technical Interview
-          </p>
-        </div>
+    <header className="sticky top-0 z-20 border-b border-line bg-canvas/85 backdrop-blur-md">
+      <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3 px-4 py-3">
+        <Brand subtitle="Technical Interview" />
         {candidate ? (
-          <div className="min-w-0 text-right">
-            <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-50">
-              {candidate.name}
-            </p>
-            <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
-              {candidate.jobRole} · {experienceLabel(candidate.yearsExperience)}
-            </p>
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line bg-surface-2 text-xs font-semibold text-ink-2">
+              {initials(candidate.name)}
+            </span>
+            <div className="min-w-0 leading-tight">
+              <p className="truncate text-sm font-medium text-ink">
+                {candidate.name}
+              </p>
+              <p className="truncate text-xs text-ink-3">
+                {candidate.jobRole} ·{" "}
+                {experienceLabel(candidate.yearsExperience)}
+              </p>
+            </div>
           </div>
         ) : null}
       </div>

@@ -46,4 +46,15 @@ export function experienceLabel(yearsExperience: number): string {
   return "Expert";
 }
 
+/** Two-letter avatar initials from a person's name. */
+export function initials(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0))
+    .join("")
+    .toUpperCase();
+}
+
 export type FinalFeedbackState = FinalFeedback | null;

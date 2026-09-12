@@ -1,26 +1,186 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+  Dark-first theming.
+  The default (no attribute) palette is the flagship dark theme. A tiny inline
+  script in app/layout.tsx sets data-theme="light" only for users who prefer it,
+  keeping the rest of the product on the crafted dark experience.
+  The `dark:` variant follows the same attribute so every component's dark:*
+  utilities stay consistent with the tokens below.
+*/
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Layered neutral surfaces */
+  --canvas: #0a0a0e;
+  --surface: #131318;
+  --surface-2: #1a1a21;
+  --surface-raised: #20202a;
+
+  /* Hairline borders */
+  --line: rgb(255 255 255 / 0.08);
+  --line-strong: rgb(255 255 255 / 0.16);
+
+  /* Text hierarchy */
+  --ink: #f4f4f6;
+  --ink-2: #a7a7b4;
+  --ink-3: #71717e;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --canvas: #fafaf8;
+  --surface: #ffffff;
+  --surface-2: #f4f4f1;
+  --surface-raised: #ffffff;
+
+  --line: rgb(24 24 27 / 0.09);
+  --line-strong: rgb(24 24 27 / 0.18);
+
+  --ink: #1b1b20;
+  --ink-2: #565660;
+  --ink-3: #8b8b94;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --color-background: var(--canvas);
+  --color-foreground: var(--ink);
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-raised: var(--surface-raised);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+
+  /* Motion language — fast, quiet, cubic-bezier eased */
+  --animate-message-in: message-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-fade-in: fade-in 0.35s ease-out both;
+  --animate-slide-up: slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/*
+  Brand accent — a refined "iris" (indigo-violet) scale.
+  Used instead of the Tailwind default so every existing indigo-* usage picks
+  up the product identity automatically.
+*/
+@theme {
+  --color-indigo-50: #eef0ff;
+  --color-indigo-100: #e2e6ff;
+  --color-indigo-200: #c7cdff;
+  --color-indigo-300: #a7adfc;
+  --color-indigo-400: #8b8bf8;
+  --color-indigo-500: #6f5ff2;
+  --color-indigo-600: #5746e9;
+  --color-indigo-700: #4638c4;
+  --color-indigo-800: #3a309d;
+  --color-indigo-900: #322d78;
+  --color-indigo-950: #1e1a47;
+}
+
+@keyframes message-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--canvas);
+    color: var(--ink);
+    font-family: var(--font-geist-sans), ui-sans-serif, system-ui,
+      -apple-system, "Segoe UI", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: rgb(111 95 242 / 0.24);
+  }
+
+  /* Accessible fallback focus; components layer their own rings on top. */
+  :where(a, button, input, textarea, select):focus-visible {
+    outline: 2px solid rgb(139 139 248 / 0.7);
+    outline-offset: 2px;
+  }
+
+  /* Refined, quiet scrollbars */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-strong) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--line-strong);
+    border: 2px solid transparent;
+    border-radius: 9999px;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--ink-3);
+    background-clip: padding-box;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* Editorial micro-label used across headers, cards and chat metadata. */
+@utility kicker {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
 }

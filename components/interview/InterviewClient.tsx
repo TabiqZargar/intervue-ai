@@ -140,9 +140,9 @@ export function InterviewClient({ candidates }: InterviewClientProps) {
         candidate={selected ? toCandidateOption(selected) : null}
       />
 
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-5 px-4 py-6 sm:py-8">
-        {(phase === "selecting" || phase === "starting") && (
-          <>
+      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 pb-14 pt-8 sm:pt-12">
+        {phase === "selecting" || phase === "starting" ? (
+          <div key="selection" className="flex animate-fade-in flex-col gap-5">
             <CandidateSelector
               candidates={options}
               selectedId={selected?.member.id ?? null}
@@ -160,12 +160,14 @@ export function InterviewClient({ candidates }: InterviewClientProps) {
                 }}
               />
             ) : null}
-          </>
-        )}
+          </div>
+        ) : null}
 
-        {(phase === "active" || phase === "submitting") && selected && (
-          <>
-            <ProgressIndicator messages={messages} total={TOTAL_QUESTIONS} />
+        {phase === "active" || phase === "submitting" ? (
+          <div key="active" className="flex animate-fade-in flex-col gap-5">
+            {selected ? (
+              <ProgressIndicator messages={messages} total={TOTAL_QUESTIONS} />
+            ) : null}
             {error ? (
               <ErrorBanner
                 message={error}
@@ -179,17 +181,23 @@ export function InterviewClient({ candidates }: InterviewClientProps) {
                 phase === "submitting" ? "Evaluating your answer…" : undefined
               }
             />
-            <AnswerComposer
-              value={draft}
-              onChange={setDraft}
-              onSubmit={() => void handleSubmitAnswer()}
-              disabled={phase === "submitting"}
-            />
-          </>
-        )}
+            <div className="sticky bottom-3 z-10 -mx-4 px-4 pb-1 pt-8">
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-transparent to-canvas"
+              />
+              <AnswerComposer
+                value={draft}
+                onChange={setDraft}
+                onSubmit={() => void handleSubmitAnswer()}
+                disabled={phase === "submitting"}
+              />
+            </div>
+          </div>
+        ) : null}
 
-        {phase === "completed" && feedback && statistics && selected && (
-          <>
+        {phase === "completed" && feedback && statistics && selected ? (
+          <div key="completed" className="flex animate-fade-in flex-col gap-5">
             <ProgressIndicator
               messages={messages}
               total={TOTAL_QUESTIONS}
@@ -201,8 +209,8 @@ export function InterviewClient({ candidates }: InterviewClientProps) {
               statistics={statistics}
               onRestart={resetInterview}
             />
-          </>
-        )}
+          </div>
+        ) : null}
       </main>
     </div>
   );

@@ -80,40 +80,43 @@ export function ResultsPreview() {
   return (
     <section
       aria-labelledby="results-preview-heading"
-      className="mx-auto w-full max-w-5xl px-4 py-16 sm:py-20"
+      className="mx-auto w-full max-w-5xl px-4 py-20 sm:py-24"
     >
       <div className="max-w-2xl">
+        <p className="kicker text-indigo-600 dark:text-indigo-400">Report</p>
         <h2
           id="results-preview-heading"
-          className="text-2xl font-semibold tracking-tight text-zinc-900 sm:text-3xl dark:text-zinc-50"
+          className="mt-3 text-3xl font-semibold tracking-tight text-ink sm:text-4xl"
         >
           See the result
         </h2>
-        <p className="mt-3 text-sm leading-6 text-zinc-600 sm:text-base sm:leading-7 dark:text-zinc-400">
+        <p className="mt-4 max-w-xl text-base leading-7 text-ink-2">
           Every interview ends with a score, sub-score breakdown, topic
           analysis, strengths, gaps, and next steps. This is an illustrative
           example.
         </p>
       </div>
 
-      <div className="mt-8 rounded-2xl border border-zinc-200 bg-zinc-50/70 px-4 py-6 sm:px-6 dark:border-zinc-800 dark:bg-zinc-900/50">
-        <div className="mb-5 flex items-center justify-between gap-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-            Sample interview report
-          </p>
-          <span className="inline-flex items-center rounded-full border border-zinc-300 bg-white px-2.5 py-0.5 text-[11px] font-medium text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+      <div className="mt-12 rounded-3xl border border-line bg-surface-2/60 p-5 sm:p-8">
+        <div className="flex items-center justify-between gap-3">
+          <p className="kicker text-ink-3">Sample interview report</p>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-1 text-[11px] font-medium text-ink-2">
+            <span
+              className="h-1.5 w-1.5 rounded-full bg-amber-400"
+              aria-hidden="true"
+            />
             Example
           </span>
         </div>
-        <div className="grid gap-4 lg:grid-cols-[auto_1fr]">
+        <div className="mt-6 grid gap-5 lg:grid-cols-[15.5rem_1fr]">
           <ScoreCard statistics={exampleStatistics} />
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-5 sm:grid-cols-2">
             <SubScoresCard statistics={exampleStatistics} />
             <FeedbackSection
               title="Strengths"
               items={exampleFeedback.strengths}
               marker="+"
-              markerClass="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400"
+              markerClass="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
             />
           </div>
         </div>
